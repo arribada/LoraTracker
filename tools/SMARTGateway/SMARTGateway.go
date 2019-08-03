@@ -19,6 +19,8 @@ import (
 	"github.com/brocaar/lorawan"
 	"github.com/pkg/errors"
 
+	"github.com/twpayne/go-geom"
+	"github.com/twpayne/go-geom/encoding/wkt"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -92,25 +94,30 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Println("reading request body err:", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	data := &DataUpPayload{}
 	err = json.Unmarshal(c, data)
 	if err != nil {
 		log.Println("unmarshaling request body err:", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	if err := s.createAlert(w, r, data); err != nil {
 		log.Println("creating an alert err:", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	log.Println("new alert created", "application name", data.ApplicationName, "sensor name", data.DeviceName)
 
-	if err := s.createPatrolUpload(w, r, data); err != nil {
-		log.Println("creating an upload err:", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	}
-	log.Println("new upload created", "application name:", data.ApplicationName, "device name:", data.DeviceName)
+	// if err := s.createPatrolUpload(w, r, data); err != nil {
+	// 	log.Println("creating an upload err:", err)
+	// 	http.Error(w, err.Error(), http.StatusBadRequest)
+	// }
+	// log.Println("new upload created", "application name:", data.ApplicationName, "device name:", data.DeviceName)
 
 }
 
@@ -135,6 +142,10 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 }
 
 func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
+	geo, err := wkt.Marshal(geom.NewPoint(geom.XY).MustSetCoords(geom.Coord{1, 2}))
+	if err != nil {
+		return fmt.Errorf("marshal geo location err:%v", err)
+	}
 	fileName := "patrol.xml"
 	fileContent := []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ns2:patrol xmlns:ns2="http://www.smartconservationsoftware.org/xml/1.2/patrol" patrolType="GROUND" startDate="2019-06-13" endDate="2019-06-13" isArmed="false" id="SMART_000007">
@@ -146,10 +157,12 @@ func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, dat
     <ns2:legs startDate="2019-06-13" endDate="2019-06-13" id="1">
         <ns2:transportType languageCode="en" value="Foot"/>
         <ns2:members givenName="David" familyName="Aliata" employeeId="195000012" isPilot="false" isLeader="true"/>
-        <ns2:days date="2019-06-13" startTime="00:00:00" endTime="23:59:59" restMinutes="0.0"/>
+		<ns2:days date="2019-06-13" startTime="00:00:00" endTime="23:59:59" restMinutes="0.0">
+			<ns2:track distance="0.05490675941109657" geom="` + geo + `"/>
+		</ns2:days>
         <ns2:mandate languageCode="en" value="Reasearch and Monitoring"/>
     </ns2:legs>
-    <ns2:comment></ns2:comment>
+	<ns2:comment></ns2:comment>
 </ns2:patrol>`)
 
 	requestJSON := []byte(`
@@ -282,6 +295,29 @@ func (s *Handler) createAlertTypeRequest(data *DataUpPayload) (string, error) {
 func (s *Handler) createAlertRequest(data *DataUpPayload) error {
 	url := s.server + "/server/api/connectalert/" + data.DevEUI.String()
 
+	coordinates := strings.Split(string(data.Data), ",")
+	if len(coordinates) < 2 {
+		return errors.New("parsing the cordinates string")
+
+	}
+
+	latitude, err := strconv.ParseFloat(coordinates[0], 64)
+	if err != nil {
+		return errors.Errorf("parsing the latitude string err:%v", err)
+
+	}
+	if latitude < -90 || latitude > 90 {
+		return errors.New("latitude outside acceptable values")
+	}
+	longitude, err := strconv.ParseFloat(coordinates[0], 64)
+	if err != nil {
+		return errors.Errorf("parsing the longitude string err:%v", err)
+
+	}
+	if longitude < -180 || longitude > 180 {
+		return errors.New("longitude outside acceptable values")
+	}
+
 	var jsonStr = []byte(`
 	{
 		"type":"FeatureCollection",
@@ -290,7 +326,7 @@ func (s *Handler) createAlertRequest(data *DataUpPayload) error {
 				"type":"Feature",
 				"geometry":	{
 					"type":"Point",
-					"coordinates":["26.440139600000002","40.474172599999996"]
+					"coordinates":["` + coordinates[1] + `","` + coordinates[0] + `"]
 				},
 				"properties":{
 					"deviceId":"` + data.DevEUI.String() + `",

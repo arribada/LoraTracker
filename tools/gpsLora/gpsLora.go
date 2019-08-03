@@ -3,11 +3,12 @@ package main
 import (
 	"bufio"
 	"encoding/hex"
-	"fmt"
-	"github.com/pkg/errors"
 	"log"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/adrianmo/go-nmea"
 	"github.com/calvernaz/rak811"
@@ -29,15 +30,15 @@ func main() {
 
 	for {
 		dataGPS := <-respChan
-		dataLora := hex.EncodeToString([]byte(dataGPS.Time.String()))
-		fmt.Println("sent data", dataLora, dataGPS)
 
-		fmt.Println(lora)
+		dataLora := hex.EncodeToString([]byte(strconv.FormatFloat(dataGPS.Latitude, 'f', -1, 64) + "," + strconv.FormatFloat(dataGPS.Longitude, 'f', -1, 64)))
 
-		resp, err := lora.Send("0,1," + dataLora)
-		if err != nil || resp != "OK" {
-			log.Fatalf("failed to send data err:%v resp:%v \n", err, resp)
+		log.Println("sending data", dataGPS, "len", len(dataLora))
+		_, err := lora.Send("0,1," + dataLora)
+		if err != nil {
+			log.Println("failed to send data err:", err)
 		}
+
 	}
 }
 
@@ -48,7 +49,7 @@ func enableGPS() (chan nmea.RMC, error) {
 		return nil, errors.Wrap(err, "enable port")
 	}
 
-	reader := bufio.NewReader(s.Reader())
+	reader := bufio.NewReader(s)
 
 	// Full ref: https://cdn-shop.adafruit.com/datasheets/PMTK_A08.pdf
 	// Turn on just minimum info (RMC only, location):
@@ -71,15 +72,22 @@ func enableGPS() (chan nmea.RMC, error) {
 		for {
 			line, err := reader.ReadString('\n')
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("reading gps serial err:%v", err)
 			}
-			parsed, err := nmea.Parse(strings.TrimSpace(line))
+			line = strings.TrimSpace(line)
+			parsed, err := nmea.Parse(line)
 			if err != nil {
-				log.Fatal(err)
+				log.Println("unable to parse GPS response err:", err)
+				continue
 			}
 			if parsed.DataType() == nmea.TypeRMC {
-				data := parsed.(nmea.RMC)
-				respChan <- data
+				dataGPS := parsed.(nmea.RMC)
+				// Send only GPS data if it is valid.
+				if dataGPS.Validity != nmea.ValidRMC {
+					log.Println("skip sending invalid GPS data", dataGPS)
+					continue
+				}
+				respChan <- dataGPS
 			}
 		}
 	}()
@@ -90,7 +98,7 @@ func enableGPS() (chan nmea.RMC, error) {
 func newLoraConnection() (*rak811.Lora, error) {
 	cfg := &serial.Config{
 		Name:        "/dev/ttyAMA0",
-		ReadTimeout: 20000 * time.Millisecond,
+		ReadTimeout: 25000 * time.Millisecond,
 	}
 	lora, err := rak811.New(cfg)
 	if err != nil {
@@ -98,30 +106,29 @@ func newLoraConnection() (*rak811.Lora, error) {
 	}
 	log.Println("lora module initialized")
 
-	if err := lora.HardReset(); err != nil {
+	resp, err := lora.HardReset()
+	if err != nil {
 		return nil, errors.Wrap(err, "reset module")
 	}
-	log.Println("lora module reset")
+	log.Println("lora module reset resp:", resp)
 
-
-	resp, err := lora.SetMode(0)
-	if err != nil{
+	resp, err = lora.SetMode(0)
+	if err != nil {
 		return nil, errors.Wrapf(err, "set lora mod")
 	}
-	log.Println("lora module mode set",resp)
+	log.Println("lora module mode set resp:", resp)
 
 	resp, err = lora.SetConfig("nwks_key:01020304050607080910111213141516&dev_eui:3038383664388108&app_key:01020304050607080910111213141516&app_eui:0000010000000000")
-	if err != nil{
+	if err != nil {
 		return nil, errors.Wrapf(err, "set lora config")
 	}
-	log.Println("lora module config set",resp)
-
+	log.Println("lora module config set resp:", resp)
 
 	resp, err = lora.JoinOTAA()
 	if err != nil {
 		return nil, errors.Wrapf(err, "lora join")
 	}
-	log.Println("lora module joined",resp)
+	log.Println("lora module joined resp:", resp)
 
 	return lora, nil
 }
