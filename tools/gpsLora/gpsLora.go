@@ -17,20 +17,36 @@ import (
 
 func main() {
 	log.SetFlags(log.Ltime | log.Lshortfile)
+	app := kingpin.New(filepath.Base(os.Args[0]), "A tool that connects to the Adafruit USB GPS board and sends the data to a RAK811 module")
+	app.HelpFlag.Short('h')
 
+	nwksKey := app.Flag("nwks_key", "lora server nwks_key").
+		Required().
+		String()
+	devEUI := app.Flag("dev_eui", "lora server dev_eui").
+		Required().
+		String()
+	appKey := app.Flag("app_key", "lora server app_key").
+		Required().
+		String()
+
+	if _, err := app.Parse(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrapf(err, "Error parsing commandline arguments"))
+		app.Usage(os.Args[1:])
+		os.Exit(2)
+	}
 	respChan, err := enableGPS()
 	if err != nil {
 		log.Fatal("failed to enable gps err:", err)
 	}
 
-	lora, err := newLoraConnection()
+	lora, err := newLoraConnection(nwksKey, devEUI, appKey)
 	if err != nil {
 		log.Fatal("failed to create lora connection err:", err)
 	}
 
 	for {
 		dataGPS := <-respChan
-
 		dataLora := hex.EncodeToString([]byte(strconv.FormatFloat(dataGPS.Latitude, 'f', -1, 64) + "," + strconv.FormatFloat(dataGPS.Longitude, 'f', -1, 64)))
 
 		log.Println("sending data", dataGPS, "len", len(dataLora))
@@ -38,7 +54,6 @@ func main() {
 		if err != nil {
 			log.Println("failed to send data err:", err)
 		}
-
 	}
 }
 
@@ -95,7 +110,7 @@ func enableGPS() (chan nmea.RMC, error) {
 	return respChan, nil
 }
 
-func newLoraConnection() (*rak811.Lora, error) {
+func newLoraConnection(nwksKey, devEUI, appKey string) (*rak811.Lora, error) {
 	cfg := &serial.Config{
 		Name:        "/dev/ttyAMA0",
 		ReadTimeout: 25000 * time.Millisecond,
@@ -118,7 +133,7 @@ func newLoraConnection() (*rak811.Lora, error) {
 	}
 	log.Println("lora module mode set resp:", resp)
 
-	resp, err = lora.SetConfig("nwks_key:01020304050607080910111213141516&dev_eui:3038383664388108&app_key:01020304050607080910111213141516&app_eui:0000010000000000")
+	resp, err = lora.SetConfig("nwks_key:" + nwksKey + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000")
 	if err != nil {
 		return nil, errors.Wrapf(err, "set lora config")
 	}
