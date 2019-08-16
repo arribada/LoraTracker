@@ -1,1 +1,12 @@
 The Dockerfile is only for arm32v6 Rpi Zero
+
+
+to build the docker image
+```
+ssh admin@gpssender.local
+git clone https://github.com/arribada/smartLoraTracker.git
+cd smartLoraTracker/tools/GPSSender
+docker build -t arribada/gpssender .
+docker login
+docker push arribada/gpssender
+```

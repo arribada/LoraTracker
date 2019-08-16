@@ -39,11 +39,18 @@ func main() {
 		app.Usage(os.Args[1:])
 		os.Exit(2)
 	}
+
+	if *debug {
+		log.Println("enabling gps module")
+	}
 	respChan, err := enableGPS(*debug)
 	if err != nil {
 		log.Fatal("failed to enable gps err:", err)
 	}
 
+	if *debug {
+		log.Println("enabling lora module")
+	}
 	lora, err := newLoraConnection(*devEUI, *appKey, *debug)
 	if err != nil {
 		log.Fatal("failed to create lora connection err:", err)
@@ -79,14 +86,14 @@ func enableGPS(debug bool) (chan nmea.RMC, error) {
 	command := "PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
 	s.Write([]byte("$" + command + "*" + XORChecksum(command) + "\r\n"))
 
-	if !gerMTKAck(314, reader) {
+	if !gerMTKAck(debug, 314, reader) {
 		return nil, errors.New("no cmd ack")
 	}
 
 	// Set update rate to once every 10 second (10hz).
 	command = "PMTK220,10000"
 	s.Write([]byte("$" + command + "*" + XORChecksum(command) + "\r\n"))
-	if !gerMTKAck(220, reader) {
+	if !gerMTKAck(debug, 220, reader) {
 		return nil, errors.New("no cmd ack")
 	}
 
@@ -100,7 +107,7 @@ func enableGPS(debug bool) (chan nmea.RMC, error) {
 			line = strings.TrimSpace(line)
 			parsed, err := nmea.Parse(line)
 			if err != nil {
-				log.Println("unable to parse GPS response err:", err)
+				log.Println("unable to parse GPS response line:", line, " err:", err)
 				continue
 			}
 			if parsed.DataType() == nmea.TypeRMC {
@@ -123,6 +130,7 @@ func enableGPS(debug bool) (chan nmea.RMC, error) {
 func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) {
 	cfg := &serial.Config{
 		ReadTimeout: 25 * time.Second,
+		// Name:        "/dev/serial0",
 	}
 	lora, err := rak811.New(cfg)
 	if err != nil {
@@ -173,12 +181,15 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 // untill it reached a reader error.
 // This ic because the module might be currenlty active so
 // might receive another response before the ack recponse.
-func gerMTKAck(cmdID int64, reader *bufio.Reader) bool {
+func gerMTKAck(debug bool, cmdID int64, reader *bufio.Reader) bool {
 	var ok bool
 	for x := 0; x < 20; x++ {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			break
+		}
+		if debug {
+			log.Println("gps cmd ack responce line:", line)
 		}
 		resp, err := nmea.Parse(strings.TrimSpace(line))
 		if err != nil {
