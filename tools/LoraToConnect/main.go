@@ -10,6 +10,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,22 +30,6 @@ func main() {
 	app := kingpin.New(filepath.Base(os.Args[0]), "A tool that listens for lora packets and send them to a remote SMART connect server")
 	app.HelpFlag.Short('h')
 
-	SMARTserver := app.Flag("SMARTserver", "server api url").
-		Required().
-		Short('s').
-		String()
-	SMARTuser := app.Flag("SMARTuser", "login username").
-		Default("smart").
-		Short('u').
-		String()
-	SMARTpass := app.Flag("SMARTpass", "login pass").
-		Default("smart").
-		Short('w').
-		String()
-	SMARTca := app.Flag("SMARTcarea", "conservation area to upload the file to").
-		Required().
-		Short('c').
-		String()
 	receivePort := app.Flag("listenPort", "http port to listen to for incomming lora packets").
 		Default("8080").
 		Short('p').
@@ -56,7 +41,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	handler := newHandler(*SMARTserver, *SMARTuser, *SMARTpass, *SMARTca)
+	handler := newHandler()
 
 	log.Println("starting server at port:", *receivePort)
 	http.Handle("/", handler)
@@ -64,18 +49,15 @@ func main() {
 
 }
 
-func newHandler(server, user, pass, ca string) *Handler {
+func newHandler() *Handler {
 	return &Handler{
-		server: server,
-		user:   user,
-		pass:   pass,
-		ca:     ca,
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		},
-		alertID: defaultAlertID,
+		alertID:   defaultAlertID,
+		careasBuf: make(map[string]struct{}),
 	}
 }
 
@@ -88,6 +70,7 @@ type Handler struct {
 	ca,
 	alertID string
 	httpClient *http.Client
+	careasBuf  map[string]struct{}
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -106,36 +89,153 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	server, ok := r.Header["Smartserver"]
+	if !ok || len(server) != 1 {
+		http.Error(w, "missing or incorrect Smartserver header", http.StatusBadRequest)
+	}
+
+	_, err = url.ParseRequestURI(server[0])
+	if err != nil {
+		http.Error(w, "invalid Smartserver url format expected: https://serverNameOrIP", http.StatusBadRequest)
+	}
+
+	user, ok := r.Header["Smartuser"]
+	if !ok || len(user) != 1 {
+		http.Error(w, "missing or incorrect Smartuser header", http.StatusBadRequest)
+	}
+	pass, ok := r.Header["Smartpass"]
+	if !ok || len(pass) != 1 {
+		http.Error(w, "missing or incorrect Smartpass header", http.StatusBadRequest)
+	}
+	carea, ok := r.Header["Smartcarea"]
+	if !ok || len(carea) != 1 {
+		http.Error(w, "missing or incorrect Smartcarea header", http.StatusBadRequest)
+	}
+
+	s.server = server[0]
+	s.user = user[0]
+	s.pass = pass[0]
+	s.ca = carea[0]
+
+	if _, ok := s.careasBuf[carea[0]]; !ok {
+		exists, err := s.careaExists(carea[0])
+		if err != nil {
+			http.Error(w, "checking if a  conservation area exists, err:"+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if !exists {
+			http.Error(w, "conservation area doesn't exist", http.StatusNotFound)
+		}
+
+		// Reset the buffer if too big.
+		if len(s.careasBuf) > 100 {
+			s.careasBuf = make(map[string]struct{})
+		}
+		s.careasBuf[carea[0]] = struct{}{}
+	}
+
 	if err := s.createAlert(w, r, data); err != nil {
 		log.Println("creating an alert err:", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Println("new alert created", "application name", data.ApplicationName, "sensor name", data.DeviceName)
+	log.Println("new alert created", "application", data.ApplicationName, "sensor", genDevID(data))
 
 	// if err := s.createPatrolUpload(w, r, data); err != nil {
 	// 	log.Println("creating an upload err:", err)
 	// 	http.Error(w, err.Error(), http.StatusBadRequest)
 	// }
-	// log.Println("new upload created", "application name:", data.ApplicationName, "device name:", data.DeviceName)
+	// log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
 
 }
 
 func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
-	exists, err := s.alertIDExists()
-	if err != nil {
-		return fmt.Errorf("checking that the alert ID exists err:%v", err)
+	url := s.server + "/server/api/connectalert/" + genDevID(data)
+
+	coordinates := strings.Split(string(data.Data), ",")
+	if len(coordinates) < 2 {
+		return errors.New("parsing the cordinates string")
+
 	}
-	if !exists {
+
+	latitude, err := strconv.ParseFloat(coordinates[0], 64)
+	if err != nil {
+		return errors.Errorf("parsing the latitude string err:%v", err)
+
+	}
+	if latitude < -90 || latitude > 90 {
+		return errors.New("latitude outside acceptable values")
+	}
+	longitude, err := strconv.ParseFloat(coordinates[0], 64)
+	if err != nil {
+		return errors.Errorf("parsing the longitude string err:%v", err)
+
+	}
+	if longitude < -180 || longitude > 180 {
+		return errors.New("longitude outside acceptable values")
+	}
+
+	var jsonStr = []byte(`
+	{
+		"type":"FeatureCollection",
+		"features":[
+			{
+				"type":"Feature",
+				"geometry":	{
+					"type":"Point",
+					"coordinates":["` + coordinates[1] + `","` + coordinates[0] + `"]
+				},
+				"properties":{
+					"deviceId":"` + genDevID(data) + `",
+					"id":"0",
+					"latitude":0,
+					"longitude":0,
+					"altitude":0,
+					"accuracy":0,
+					"caUuid":"` + s.ca + `",
+					"level":"1",
+					"description":"` + string(data.Data) + `",
+					"typeUuid":"` + s.alertID + `",
+					"sighting":{}
+					}
+			}
+		]
+	}`)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	if err != nil {
+		return fmt.Errorf("creating a request err:%v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(s.user, s.pass)
+
+	res, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("sending the request err:%v", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK || res.StatusCode != http.StatusCreated {
+		return fmt.Errorf("unexpected response status code:%v", res.StatusCode)
+	}
+
+	response := &SMARTAlertType{}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(body, response)
+	if err != nil {
+		return err
+	}
+	// Empty UUID means that the alert type doesn't exists to need to create it.
+	if response.UUID == "00000000-0000-0000-0000-000000000000" {
 		log.Println("creating a missing alert type UUID:", s.alertID)
-		s.alertID, err = s.createAlertTypeRequest(data)
+		s.alertID, err = s.createAlertType(data)
 		if err != nil {
 			return fmt.Errorf("checking that the alert ID exists err:%v", err)
 		}
 		log.Println("new alert type UUID:", s.alertID)
-	}
-	if err := s.createAlertRequest(data); err != nil {
-		return fmt.Errorf("sending alert create request to the SMART connect server err:%v", err)
+		return s.createAlert(w, r, data)
 	}
 
 	return nil
@@ -193,11 +293,11 @@ func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, dat
 	}
 	res.Body.Close()
 
-	// Make the actual request to upload the file.
+	// Make the actual file upload.
 	{
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("upload_file", filepath.Base(fileName))
+		part, err := writer.CreateFormFile("upload_file", fileName)
 		if err != nil {
 			return fmt.Errorf("creating an upload form err:%v", err)
 		}
@@ -224,18 +324,18 @@ func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, dat
 	return nil
 }
 
-func (s *Handler) alertIDExists() (bool, error) {
-	url := s.server + "/server/api/connectalert/alertTypes"
+func (s *Handler) careaExists(ca string) (bool, error) {
+	url := s.server + "/server/api/conservationarea"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Println(err)
+		return false, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(s.user, s.pass)
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		log.Println(err)
+		return false, err
 	}
 	defer resp.Body.Close()
 
@@ -250,12 +350,59 @@ func (s *Handler) alertIDExists() (bool, error) {
 	return strings.Contains(string(body), `"uuid":"`+s.alertID+`"`), nil
 }
 
-func (s *Handler) createAlertTypeRequest(data *DataUpPayload) (string, error) {
-	url := s.server + "/server/api/connectalert/alertTypes/" + data.DevEUI.String()
+func (s *Handler) createCarea(data *DataUpPayload) error {
+	url := s.server + "/server/api/conservationarea?cauuid=" + s.ca + "&name=" + data.ApplicationName
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(s.user, s.pass)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("invalid status code response:%v", resp.Status)
+	}
+
+	return nil
+}
+
+func (s *Handler) alertIDExists() (bool, error) {
+	url := s.server + "/server/api/connectalert/alertTypes"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(s.user, s.pass)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("invalid status code response: %v", resp.Status)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+	return strings.Contains(string(body), `"uuid":"`+s.alertID+`"`), nil
+}
+
+func (s *Handler) createAlertType(data *DataUpPayload) (string, error) {
+	url := s.server + "/server/api/connectalert/alertTypes/" + genDevID(data)
 
 	var jsonStr = []byte(`
 	{
-		"label":"` + data.DevEUI.String() + `",
+		"label":"` + genDevID(data) + `",
 		"color":"5AFF54",
 		"opacity":".80",
 		"markerIcon":"cloud",
@@ -265,14 +412,14 @@ func (s *Handler) createAlertTypeRequest(data *DataUpPayload) (string, error) {
 	  }`)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
 	if err != nil {
-		log.Println(err)
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(s.user, s.pass)
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		log.Println(err)
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
@@ -292,75 +439,8 @@ func (s *Handler) createAlertTypeRequest(data *DataUpPayload) (string, error) {
 	return response.UUID, nil
 }
 
-func (s *Handler) createAlertRequest(data *DataUpPayload) error {
-	url := s.server + "/server/api/connectalert/" + data.DevEUI.String()
-
-	coordinates := strings.Split(string(data.Data), ",")
-	if len(coordinates) < 2 {
-		return errors.New("parsing the cordinates string")
-
-	}
-
-	latitude, err := strconv.ParseFloat(coordinates[0], 64)
-	if err != nil {
-		return errors.Errorf("parsing the latitude string err:%v", err)
-
-	}
-	if latitude < -90 || latitude > 90 {
-		return errors.New("latitude outside acceptable values")
-	}
-	longitude, err := strconv.ParseFloat(coordinates[0], 64)
-	if err != nil {
-		return errors.Errorf("parsing the longitude string err:%v", err)
-
-	}
-	if longitude < -180 || longitude > 180 {
-		return errors.New("longitude outside acceptable values")
-	}
-
-	var jsonStr = []byte(`
-	{
-		"type":"FeatureCollection",
-		"features":[
-			{
-				"type":"Feature",
-				"geometry":	{
-					"type":"Point",
-					"coordinates":["` + coordinates[1] + `","` + coordinates[0] + `"]
-				},
-				"properties":{
-					"deviceId":"` + data.DevEUI.String() + `",
-					"id":"0",
-					"latitude":0,
-					"longitude":0,
-					"altitude":0,
-					"accuracy":0,
-					"caUuid":"` + s.ca + `",
-					"level":"1",
-					"description":"` + string(data.Data) + `",
-					"typeUuid":"` + s.alertID + `",
-					"sighting":{}
-					}
-			}
-		]
-	}`)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-	if err != nil {
-		return fmt.Errorf("creating a request err:%v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(s.user, s.pass)
-
-	res, err := s.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("sending the request err:%v", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected response status code:%v", res.StatusCode)
-	}
-	return nil
+func genDevID(data *DataUpPayload) string {
+	return data.DeviceName + "-" + data.DevEUI.String()
 }
 
 // DataUpPayload represents a data-up payload.

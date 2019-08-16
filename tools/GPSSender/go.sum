@@ -1,3 +1,10 @@
+github.com/adrianmo/go-nmea v1.1.1-0.20190603151144-9861e243767d/go.mod h1:HHPxPAm2kmev+61qmkZh7xgZF/7qHtSpsWppip2Ipv8=
+github.com/adrianmo/go-nmea v1.1.1-0.20190809134752-fb3e95815d06 h1:K6QhGNgvBWqqM7Kvw1asEaEs2Z0fGuGQMXOZZ+qVS14=
+github.com/adrianmo/go-nmea v1.1.1-0.20190809134752-fb3e95815d06/go.mod h1:unsZUyxle3sYuVytxYAkVeIJttLbB3KZexc/A/vlnBI=
+github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 h1:JYp7IbQjafoB+tBA3gMyHYHrpOtNuDiK/uB5uXxq5wM=
+github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
+github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4 h1:Hs82Z41s6SdL1CELW+XaDYmOH4hkBN4/N9og/AsOv7E=
+github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/calvernaz/rak811 v0.0.0-20190804084735-96a5f835ea87 h1:EmMo1RAWgMyBzZ56GqB41MAgB85/+a5/tKR/DEOd5YY=
 github.com/calvernaz/rak811 v0.0.0-20190804084735-96a5f835ea87/go.mod h1:Fe3ovWDTLDyixAWJKRj6/pvJjSR3VgWX3/hY8HsoCzU=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -14,3 +21,5 @@ github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07 h1:UyzmZLoiDWMRywV4DUY
 github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07/go.mod h1:kDXzergiv9cbyO7IOYJZWg1U88JhDg3PB6klq9Hg2pA=
 golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e h1:D5TXcfTk7xF7hvieo4QErS3qqCB4teTffacDWr7CI+0=
 golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+gopkg.in/alecthomas/kingpin.v2 v2.2.6 h1:jMFz6MfLP0/4fUyZle81rXUoxOBFi19VUFKVDOQfozc=
+gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=

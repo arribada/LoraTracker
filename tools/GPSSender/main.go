@@ -3,16 +3,21 @@ package main
 import (
 	"bufio"
 	"encoding/hex"
+	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 
+	"path/filepath"
+
 	"github.com/adrianmo/go-nmea"
 	"github.com/calvernaz/rak811"
 	"github.com/tarm/serial"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 func main() {
@@ -20,27 +25,26 @@ func main() {
 	app := kingpin.New(filepath.Base(os.Args[0]), "A tool that connects to the Adafruit USB GPS board and sends the data to a RAK811 module")
 	app.HelpFlag.Short('h')
 
-	nwksKey := app.Flag("nwks_key", "lora server nwks_key").
-		Required().
-		String()
 	devEUI := app.Flag("dev_eui", "lora server dev_eui").
 		Required().
 		String()
 	appKey := app.Flag("app_key", "lora server app_key").
 		Required().
 		String()
+	debug := app.Flag("debug", "show debug logs").
+		Bool()
 
 	if _, err := app.Parse(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrapf(err, "Error parsing commandline arguments"))
 		app.Usage(os.Args[1:])
 		os.Exit(2)
 	}
-	respChan, err := enableGPS()
+	respChan, err := enableGPS(*debug)
 	if err != nil {
 		log.Fatal("failed to enable gps err:", err)
 	}
 
-	lora, err := newLoraConnection(nwksKey, devEUI, appKey)
+	lora, err := newLoraConnection(*devEUI, *appKey, *debug)
 	if err != nil {
 		log.Fatal("failed to create lora connection err:", err)
 	}
@@ -53,11 +57,15 @@ func main() {
 		_, err := lora.Send("0,1," + dataLora)
 		if err != nil {
 			log.Println("failed to send data err:", err)
+			// Attempt to register again.
+			log.Println("attempting to register again")
+			lora, _ = newLoraConnection(*devEUI, *appKey, *debug)
 		}
+
 	}
 }
 
-func enableGPS() (chan nmea.RMC, error) {
+func enableGPS(debug bool) (chan nmea.RMC, error) {
 	c := &serial.Config{Name: "/dev/ttyUSB0", Baud: 9600, ReadTimeout: 3000 * time.Second}
 	s, err := serial.OpenPort(c)
 	if err != nil {
@@ -69,7 +77,7 @@ func enableGPS() (chan nmea.RMC, error) {
 	// Full ref: https://cdn-shop.adafruit.com/datasheets/PMTK_A08.pdf
 	// Turn on just minimum info (RMC only, location):
 	command := "PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
-	s.Write([]byte("$" + command + "*" + nmea.XORChecksum(command) + "\r\n"))
+	s.Write([]byte("$" + command + "*" + XORChecksum(command) + "\r\n"))
 
 	if !gerMTKAck(314, reader) {
 		return nil, errors.New("no cmd ack")
@@ -77,7 +85,7 @@ func enableGPS() (chan nmea.RMC, error) {
 
 	// Set update rate to once every 10 second (10hz).
 	command = "PMTK220,10000"
-	s.Write([]byte("$" + command + "*" + nmea.XORChecksum(command) + "\r\n"))
+	s.Write([]byte("$" + command + "*" + XORChecksum(command) + "\r\n"))
 	if !gerMTKAck(220, reader) {
 		return nil, errors.New("no cmd ack")
 	}
@@ -99,7 +107,9 @@ func enableGPS() (chan nmea.RMC, error) {
 				dataGPS := parsed.(nmea.RMC)
 				// Send only GPS data if it is valid.
 				if dataGPS.Validity != nmea.ValidRMC {
-					log.Println("skip sending invalid GPS data", dataGPS)
+					if debug {
+						log.Println("skip sending invalid GPS data", dataGPS)
+					}
 					continue
 				}
 				respChan <- dataGPS
@@ -110,10 +120,9 @@ func enableGPS() (chan nmea.RMC, error) {
 	return respChan, nil
 }
 
-func newLoraConnection(nwksKey, devEUI, appKey string) (*rak811.Lora, error) {
+func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) {
 	cfg := &serial.Config{
-		Name:        "/dev/ttyAMA0",
-		ReadTimeout: 25000 * time.Millisecond,
+		ReadTimeout: 25 * time.Second,
 	}
 	lora, err := rak811.New(cfg)
 	if err != nil {
@@ -133,18 +142,30 @@ func newLoraConnection(nwksKey, devEUI, appKey string) (*rak811.Lora, error) {
 	}
 	log.Println("lora module mode set resp:", resp)
 
-	resp, err = lora.SetConfig("nwks_key:" + nwksKey + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000")
+	config := "dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
+	resp, err = lora.SetConfig(config)
 	if err != nil {
-		return nil, errors.Wrapf(err, "set lora config")
+		return nil, errors.Wrapf(err, "set lora config with:%v", config)
 	}
-	log.Println("lora module config set resp:", resp)
-
-	resp, err = lora.JoinOTAA()
-	if err != nil {
-		return nil, errors.Wrapf(err, "lora join")
+	if debug {
+		log.Print("lora module config set resp:", resp, " config:", config)
 	}
-	log.Println("lora module joined resp:", resp)
 
+	// Try to register undefinitely.
+	// The lora gateway might be down so should keep trying and not exit.
+	attempt := 1
+	for {
+		resp, err = lora.JoinOTAA()
+		if err == nil {
+			log.Println("lora module joined resp:", resp)
+			break
+		}
+		if debug {
+			log.Print("gateway registration attempt:", attempt)
+		}
+		time.Sleep(10 * time.Second)
+		attempt++
+	}
 	return lora, nil
 }
 
@@ -152,7 +173,7 @@ func newLoraConnection(nwksKey, devEUI, appKey string) (*rak811.Lora, error) {
 // untill it reached a reader error.
 // This ic because the module might be currenlty active so
 // might receive another response before the ack recponse.
-func gerMTKAck(cmdID int, reader *bufio.Reader) bool {
+func gerMTKAck(cmdID int64, reader *bufio.Reader) bool {
 	var ok bool
 	for x := 0; x < 20; x++ {
 		line, err := reader.ReadString('\n')
@@ -160,6 +181,9 @@ func gerMTKAck(cmdID int, reader *bufio.Reader) bool {
 			break
 		}
 		resp, err := nmea.Parse(strings.TrimSpace(line))
+		if err != nil {
+			log.Fatal("parsing the response err:", err)
+		}
 		if resp.TalkerID() == nmea.TypeMTK {
 			d := resp.(nmea.MTK)
 			if d.Cmd == cmdID && d.Flag == 3 {
@@ -169,4 +193,14 @@ func gerMTKAck(cmdID int, reader *bufio.Reader) bool {
 		}
 	}
 	return ok
+}
+
+// XORChecksum xor all the bytes in a string an return it
+// as an uppercase hex string
+func XORChecksum(s string) string {
+	var checksum uint8
+	for i := 0; i < len(s); i++ {
+		checksum ^= s[i]
+	}
+	return fmt.Sprintf("%02X", checksum)
 }
