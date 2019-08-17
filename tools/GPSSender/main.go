@@ -129,13 +129,14 @@ func enableGPS(debug bool) (chan nmea.RMC, error) {
 
 func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) {
 	cfg := &serial.Config{
-		ReadTimeout: 25 * time.Second,
+		ReadTimeout: 55 * time.Second,
 		Name:        "/dev/ttyAMA0", // Inside docker /dev/serial0 is not available even in priviliged.
 	}
 	lora, err := rak811.New(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "create rak811 instance")
 	}
+
 	log.Println("lora module initialized")
 
 	resp, err := lora.HardReset()
@@ -163,15 +164,20 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 	// The lora gateway might be down so should keep trying and not exit.
 	attempt := 1
 	for {
-		resp, err = lora.JoinOTAA()
-		if err == nil {
-			log.Println("lora module joined resp:", resp)
+		now := time.Now()
+		resp, err = lora.JoinOTAA(5 * time.Minute)
+		if err != nil {
+			log.Println("lora module didn't respond within the set timeout reseting", resp)
+			newLoraConnection(devEUI, appKey, debug)
+		}
+
+		if resp == rak811.JoinSuccess {
+			log.Println("lora module joined, request duration:", time.Since(now))
 			break
 		}
 		if debug {
-			log.Print("gateway registration attempt:", attempt)
+			log.Print("gateway registration err:", err, " attempt:", attempt)
 		}
-		time.Sleep(10 * time.Second)
 		attempt++
 	}
 	return lora, nil

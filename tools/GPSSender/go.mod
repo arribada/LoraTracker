@@ -18,4 +18,4 @@ require (
 
 // replace github.com/adrianmo/go-nmea => ../../../../adrianmo/go-nmea
 
-// replace github.com/calvernaz/rak811 => ../../../../calvernaz/rak811
+replace github.com/calvernaz/rak811 => github.com/krasi-georgiev/rak811 v0.0.0-20190817120852-5e9aeb779eb7
