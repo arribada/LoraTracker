@@ -130,7 +130,7 @@ func enableGPS(debug bool) (chan nmea.RMC, error) {
 func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) {
 	cfg := &serial.Config{
 		ReadTimeout: 25 * time.Second,
-		// Name:        "/dev/serial0",
+		Name:        "/dev/ttyAMA0", // Inside docker /dev/serial0 is not available even in priviliged.
 	}
 	lora, err := rak811.New(cfg)
 	if err != nil {
