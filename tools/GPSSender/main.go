@@ -165,9 +165,9 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 	attempt := 1
 	for {
 		now := time.Now()
-		resp, err = lora.JoinOTAA(5 * time.Minute)
+		resp, err = lora.JoinOTAA(10 * time.Minute)
 		if err != nil {
-			log.Println("lora module didn't respond within the set timeout reseting", resp)
+			log.Println("Reseting the modile due to a join request err:", err)
 			newLoraConnection(devEUI, appKey, debug)
 		}
 
@@ -176,7 +176,7 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 			break
 		}
 		if debug {
-			log.Print("gateway registration err:", err, " attempt:", attempt)
+			log.Print("unexpected gateway registration resp:", resp, " attempt:", attempt)
 		}
 		attempt++
 	}
