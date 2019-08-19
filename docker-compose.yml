@@ -1,0 +1,29 @@
+version: '3.6'
+services:
+  postgres:
+    image: arribada/postgis
+    secrets:
+      - postgres-user
+      - postgres-pass
+    environment:
+      POSTGRES_USER: $POSTGRES_USER # The username is also used for the db name.
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+    volumes:
+    - postgres:/var/lib/postgresql/data
+    - ./postgres/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
+  tomcat:
+    image: arribada/smart-connect
+    ports:
+    - "8443:8443"
+    volumes:
+    - tomcat:/home/SMARTconnect/filestore/
+    environment:
+      POSTGRES_HOSTNAME: postgres
+      POSTGRES_PORT: 5432
+  lora-connect:
+    image: arribada/lora-connect
+    ports:
+    - "8070:8070"
+volumes:
+  tomcat:
+  postgres:

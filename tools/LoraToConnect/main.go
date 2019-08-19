@@ -31,7 +31,7 @@ func main() {
 	app.HelpFlag.Short('h')
 
 	receivePort := app.Flag("listenPort", "http port to listen to for incomming lora packets").
-		Default("8080").
+		Default("8070").
 		Short('p').
 		String()
 
