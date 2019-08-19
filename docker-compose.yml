@@ -27,3 +27,6 @@ services:
 volumes:
   tomcat:
   postgres:
+networks:
+  default:
+  driver: bridge
