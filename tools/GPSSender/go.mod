@@ -3,7 +3,7 @@ module github.com/arribada/loraTracker/tools/GPSSender
 go 1.12
 
 require (
-	github.com/adrianmo/go-nmea v1.1.1-0.20190809134752-fb3e95815d06
+	github.com/adrianmo/go-nmea v1.1.1-0.20190825145351-5400ee2b5d6e
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
