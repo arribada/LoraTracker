@@ -1,23 +1,23 @@
 version: "2.1"
 
 services:
-  postgresSmart:
+  smart-postgres:
     image: arribada/smart-connect-postgis
     environment:
       POSTGRES_USER: $POSTGRES_USER # The username is also used for the db name.
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
     volumes:
-    - postgresSmart:/var/lib/postgresql/data
-  tomcat:
+    - smart-postgres:/var/lib/postgresql/data
+  smart-connect:
     image: arribada/smart-connect
     depends_on:
-      - postgresSmart
+      - smart-postgres
     ports:
     - "8443:8443"
     volumes:
-    - tomcat:/home/SMARTconnect/filestore/
+    - smart-connect:/home/SMARTconnect/filestore/
     environment:
-      POSTGRES_HOSTNAME: postgresSmart
+      POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: $POSTGRES_USER
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
@@ -32,17 +32,20 @@ services:
     environment:
       - PORT=8090 # The web port on which to show the gateway ID.
       - CONCENTRATOR_RESET_PIN=22
+      - GW_HOST=gatewaybridge # Where to send the packets
     ports:
       - 8090:8090 
   loraserver:
     image: arribada/loraserver
-#     volumes:
-#       - ./loraserver-docker/configuration/loraserver:/etc/loraserver
+    depends_on:
+      - postgresql
+# #     volumes:
+# #       - ./loraserver-docker/configuration/loraserver:/etc/loraserver
 
   appserver:
     image: arribada/lora-app-server
     depends_on:
-      - postgresLora
+      - postgresql
     ports:
       - 8080:8080
     # volumes:
@@ -50,8 +53,8 @@ services:
 
   gatewaybridge:
     image: arribada/lora-gateway-bridge
-    ports:
-      - 1700:1700/udp
+    # ports:
+    #   - 1700:1700/udp
 #     volumes:
 #       - ./loraserver-docker/configuration/lora-gateway-bridge:/etc/lora-gateway-bridge
 
@@ -60,16 +63,16 @@ services:
 #     volumes:
 #       - ./loraserver-docker/configuration/lora-geo-server:/etc/lora-geo-server
 
-  postgresLora:
+  postgresql:
     image: arribada/loraserver-postgres
     volumes:
-      - postgresLora:/var/lib/postgresql/data
+      - lora-postgres:/var/lib/postgresql/data
       # - ./loraserver-docker/configuration/postgresql/initdb:/docker-entrypoint-initdb.d
 
   redis:
     image: redis:5-alpine
     volumes:
-      - redisdata:/data
+      - lora-redis:/data
 
   mosquitto:
     image: eclipse-mosquitto
@@ -77,7 +80,7 @@ services:
       - 1883:1883
 
 volumes:
-  postgresSmart:
-  postgresLora:
-  redisdata:
-  tomcat:
+  smart-postgres:
+  smart-connect:
+  lora-postgres:
+  lora-redis:
