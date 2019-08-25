@@ -424,12 +424,11 @@ func (s *Handler) createAlertType(data *DataUpPayload) (string, error) {
 	var jsonStr = []byte(`
 	{
 		"label":"` + genDevID(data) + `",
-		"color":"5AFF54",
+		"color":"FF0526",
 		"opacity":".80",
-		"markerIcon":"cloud",
-		"markerColor":"blue",
+		"markerIcon":"car",
+		"markerColor":"black",
 		"spin":"false",
-		"customIcon":"99"
 	  }`)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
 	if err != nil {
