@@ -44,6 +44,9 @@ func main() {
 	handler := newHandler()
 
 	log.Println("starting server at port:", *receivePort)
+	if os.Getenv("DEBUG") != "" {
+		log.Println("displaying debug logs")
+	}
 	http.Handle("/", handler)
 	log.Fatal(http.ListenAndServe(":"+*receivePort, nil))
 
@@ -56,7 +59,8 @@ func newHandler() *Handler {
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		},
-		alertID:   defaultAlertID,
+		alertID: defaultAlertID,
+		// careasBuf is a buffer to reduce the API calls.
 		careasBuf: make(map[string]struct{}),
 	}
 }
@@ -79,6 +83,10 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Println("reading request body err:", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	if os.Getenv("DEBUG") != "" {
+		log.Println("incoming request body:", string(c))
 	}
 
 	data := &DataUpPayload{}
@@ -124,7 +132,11 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !exists {
+			if os.Getenv("DEBUG") != "" {
+				log.Println("CA area doesn't exist uuid:", s.ca)
+			}
 			http.Error(w, "conservation area doesn't exist", http.StatusNotFound)
+			return
 		}
 
 		// Reset the buffer if too big.
@@ -139,14 +151,14 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Println("new alert created", "application", data.ApplicationName, "sensor", genDevID(data))
+	log.Println("alert created", "application", data.ApplicationName, "sensor", genDevID(data))
 
 	// if err := s.createPatrolUpload(w, r, data); err != nil {
 	// 	log.Println("creating an upload err:", err)
 	// 	http.Error(w, err.Error(), http.StatusBadRequest)
 	// }
 	// log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
-
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
@@ -214,7 +226,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK || res.StatusCode != http.StatusCreated {
+	if res.StatusCode/100 != 2 {
 		return fmt.Errorf("unexpected response status code:%v", res.StatusCode)
 	}
 
@@ -223,12 +235,16 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	if err != nil {
 		return err
 	}
+
+	if os.Getenv("DEBUG") != "" {
+		log.Printf("SMART connect reply status:%v, body:%v", res.StatusCode, string(body))
+	}
 	err = json.Unmarshal(body, response)
 	if err != nil {
 		return err
 	}
-	// Empty UUID means that the alert type doesn't exists to need to create it.
-	if response.UUID == "00000000-0000-0000-0000-000000000000" {
+	// Empty typeUuid means that the alert type doesn't exists to need to create it.
+	if response.TypeUUID == "00000000-0000-0000-0000-000000000000" {
 		log.Println("creating a missing alert type UUID:", s.alertID)
 		s.alertID, err = s.createAlertType(data)
 		if err != nil {
@@ -283,7 +299,7 @@ func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, dat
 	if err != nil {
 		return fmt.Errorf("sending file upload request err:%v", err)
 	}
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode/100 != 2 {
 		return fmt.Errorf("unexpected response status code:%v", res.StatusCode)
 	}
 
@@ -339,7 +355,7 @@ func (s *Handler) careaExists(ca string) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode/100 != 2 {
 		return false, fmt.Errorf("invalid status code response: %v", resp.Status)
 	}
 
@@ -347,7 +363,12 @@ func (s *Handler) careaExists(ca string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return strings.Contains(string(body), `"uuid":"`+s.alertID+`"`), nil
+
+	if os.Getenv("DEBUG") != "" {
+		log.Println("CA area check response body:", string(body))
+	}
+
+	return strings.Contains(string(body), `"uuid":"`+s.ca+`"`), nil
 }
 
 func (s *Handler) createCarea(data *DataUpPayload) error {
@@ -484,5 +505,6 @@ type Location struct {
 }
 
 type SMARTAlertType struct {
-	UUID string `json:"uuid"`
+	UUID     string `json:"uuid"`
+	TypeUUID string `json:"typeUuid"`
 }
