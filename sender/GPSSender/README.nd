@@ -1,0 +1,3 @@
+The Dockerfile is only for arm32v6 Rpi Zero.
+
+Can be pushed to Rpi running `balena push appName` from within the directory.

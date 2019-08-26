@@ -2,5 +2,5 @@ version: "2.1"
 
 services:
   gpssender:
-    build: ./
+    build: ./GPSSender
     privileged: true
