@@ -2,14 +2,14 @@ version: "2.1"
 
 services:
   smart-postgres:
-    image: arribada/smart-connect-postgis
+    image: arribada/smart-connect-postgis:v0.0.1
     environment:
       POSTGRES_USER: $POSTGRES_USER # The username is also used for the db name.
       POSTGRES_PASSWORD: $POSTGRES_PASSWORD
     volumes:
     - smart-postgres:/var/lib/postgresql/data
   smart-connect:
-    image: arribada/smart-connect
+    image: arribada/smart-connect:v0.0.1
     depends_on:
       - smart-postgres
     ports:
