@@ -39,8 +39,6 @@ services:
     image: arribada/loraserver
     depends_on:
       - postgresql
-# #     volumes:
-# #       - ./loraserver-docker/configuration/loraserver:/etc/loraserver
 
   appserver:
     image: arribada/lora-app-server
@@ -48,26 +46,17 @@ services:
       - postgresql
     ports:
       - 8080:8080
-    # volumes:
-    #   - ./loraserver-docker/configuration/lora-app-server:/etc/lora-app-server
 
   gatewaybridge:
     image: arribada/lora-gateway-bridge
-    # ports:
-    #   - 1700:1700/udp
-#     volumes:
-#       - ./loraserver-docker/configuration/lora-gateway-bridge:/etc/lora-gateway-bridge
 
   geoserver:
     image: arribada/lora-geo-server
-#     volumes:
-#       - ./loraserver-docker/configuration/lora-geo-server:/etc/lora-geo-server
 
   postgresql:
     image: arribada/loraserver-postgres
     volumes:
       - lora-postgres:/var/lib/postgresql/data
-      # - ./loraserver-docker/configuration/postgresql/initdb:/docker-entrypoint-initdb.d
 
   redis:
     image: redis:5-alpine
