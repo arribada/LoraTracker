@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/adrianmo/go-nmea"
-	"github.com/krasi-georgiev/rak811"
+	"github.com/arribada/rak811"
 	"github.com/tarm/serial"
 )
 
@@ -88,7 +88,7 @@ func main() {
 			attempt = 1
 		}
 		if resp == rak811.STATUS_TX_UNCOMFIRMED {
-			log.Println("unconfirmed data sent data:", dataLora)
+			log.Println("unconfirmed data sent data:",dataGPS)
 			attempt = 1
 		}
 	}
