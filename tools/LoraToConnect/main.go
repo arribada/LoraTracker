@@ -59,22 +59,21 @@ func newHandler() *Handler {
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		},
-		alertID: defaultAlertID,
-		// careasBuf is a buffer to reduce the API calls.
-		careasBuf: make(map[string]struct{}),
+		alertIDBuf: make(map[string]string),
+		careasBuf:  make(map[string]struct{}),
 	}
 }
-
-const defaultAlertID = "b9bb1bd0-52ec-47a2-8908-0b599244fb69"
 
 type Handler struct {
 	server,
 	user,
 	pass,
-	ca,
-	alertID string
+	ca string
 	httpClient *http.Client
-	careasBuf  map[string]struct{}
+	// alertIDBuf is used to reduce the API calls.
+	alertIDBuf map[string]string
+	// careasBuf is used to reduce the API calls.
+	careasBuf map[string]struct{}
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +150,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Println("alert created", "application", data.ApplicationName, "sensor", genDevID(data))
+	log.Println("alert created", "application:", data.ApplicationName, "sensor id:", genDevID(data))
 
 	// if err := s.createPatrolUpload(w, r, data); err != nil {
 	// 	log.Println("creating an upload err:", err)
@@ -162,6 +161,29 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
+	devID := genDevID(data)
+	var alertID string
+	var err error
+	if _, ok := s.alertIDBuf[devID]; !ok {
+		alertID, err = s.alertID(devID)
+		if err != nil {
+			return fmt.Errorf("getting the alert id by the device devID err:%v", err)
+		}
+		// AlertID with this devID doesn't exists so need to create it.
+		if alertID == "" {
+			alertID, err = s.createAlertType(devID)
+			if err != nil {
+				return fmt.Errorf("creating a new alertType for devID:%v err:%v", devID, err)
+			}
+		}
+
+		// Reset the buffer if too big.
+		if len(s.alertIDBuf) > 100 {
+			s.alertIDBuf = make(map[string]string)
+		}
+		s.alertIDBuf[devID] = alertID
+	}
+
 	url := s.server + "/server/api/connectalert/" + genDevID(data)
 
 	coordinates := strings.Split(string(data.Data), ",")
@@ -198,7 +220,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 					"coordinates":["` + coordinates[1] + `","` + coordinates[0] + `"]
 				},
 				"properties":{
-					"deviceId":"` + genDevID(data) + `",
+					"deviceId":"` + devID + `",
 					"id":"0",
 					"latitude":0,
 					"longitude":0,
@@ -207,7 +229,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 					"caUuid":"` + s.ca + `",
 					"level":"1",
 					"description":"` + string(data.Data) + `",
-					"typeUuid":"` + s.alertID + `",
+					"typeUuid":"` + alertID + `",
 					"sighting":{}
 					}
 			}
@@ -243,15 +265,10 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	if err != nil {
 		return err
 	}
-	// Empty typeUuid means that the alert type doesn't exists to need to create it.
+	// Empty typeUuid means that the alert type doesn't exists.
+	// This shouldn't happen.
 	if response.TypeUUID == "00000000-0000-0000-0000-000000000000" {
-		log.Println("creating a missing alert type UUID:", s.alertID)
-		s.alertID, err = s.createAlertType(data)
-		if err != nil {
-			return fmt.Errorf("checking that the alert ID exists err:%v", err)
-		}
-		log.Println("new alert type UUID:", s.alertID)
-		return s.createAlert(w, r, data)
+		log.Println("creating an alert returned an empty  'TypeUUID'")
 	}
 
 	return nil
@@ -392,39 +409,50 @@ func (s *Handler) createCarea(data *DataUpPayload) error {
 	return nil
 }
 
-func (s *Handler) alertIDExists() (bool, error) {
+func (s *Handler) alertID(devID string) (string, error) {
 	url := s.server + "/server/api/connectalert/alertTypes"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(s.user, s.pass)
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("invalid status code response: %v", resp.Status)
+		return "", fmt.Errorf("invalid status code response: %v", resp.Status)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return false, err
+		return "", err
 	}
-	return strings.Contains(string(body), `"uuid":"`+s.alertID+`"`), nil
+
+	alertTypes := make([]SMARTAlertType, 0)
+	err = json.Unmarshal(body, &alertTypes)
+	if err != nil {
+		return "", err
+	}
+	for _, alertType := range alertTypes {
+		if alertType.Label == devID {
+			return alertType.UUID, nil
+		}
+	}
+	return "", nil
 }
 
-func (s *Handler) createAlertType(data *DataUpPayload) (string, error) {
-	url := s.server + "/server/api/connectalert/alertTypes/" + genDevID(data)
+func (s *Handler) createAlertType(label string) (string, error) {
+	url := s.server + "/server/api/connectalert/alertTypes/" + label
 
 	var jsonStr = []byte(`
 	{
-		"label":"` + genDevID(data) + `",
-		"color":"FF0526",
+		"label":"` + label + `",
+		"color":"FF0000",
 		"opacity":".80",
 		"markerIcon":"car",
 		"markerColor":"black",
@@ -506,4 +534,5 @@ type Location struct {
 type SMARTAlertType struct {
 	UUID     string `json:"uuid"`
 	TypeUUID string `json:"typeUuid"`
+	Label    string `json:"label"`
 }
