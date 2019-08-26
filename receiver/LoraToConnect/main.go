@@ -150,7 +150,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Println("alert created", "application:", data.ApplicationName, "sensor id:", genDevID(data))
+	log.Println("alert created for application:", data.ApplicationName, ",device id:", genDevID(data))
 
 	// if err := s.createPatrolUpload(w, r, data); err != nil {
 	// 	log.Println("creating an upload err:", err)
@@ -162,15 +162,16 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
 	devID := genDevID(data)
-	var alertID string
 	var err error
-	if _, ok := s.alertIDBuf[devID]; !ok {
+	alertID, ok := s.alertIDBuf[devID]
+	if !ok {
 		alertID, err = s.alertID(devID)
 		if err != nil {
 			return fmt.Errorf("getting the alert id by the device devID err:%v", err)
 		}
 		// AlertID with this devID doesn't exists so need to create it.
 		if alertID == "" {
+			log.Println("alert type with the given device label doesn't exist so creating a new one dev id:", devID)
 			alertID, err = s.createAlertType(devID)
 			if err != nil {
 				return fmt.Errorf("creating a new alertType for devID:%v err:%v", devID, err)
