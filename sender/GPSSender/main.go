@@ -69,9 +69,38 @@ func main() {
 	attempt := 1
 	for {
 		dataGPS := <-respChan
+
+		// Send only GPS data if it is valid.
+		if dataGPS.FixQuality == nmea.Invalid {
+			if os.Getenv("SEND_FAKE_GPS") == "" {
+				if debug {
+					log.Println("skipped sending an invalid data:", dataGPS)
+				}
+				continue
+			}
+			fake:="GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
+			parsed, err := nmea.Parse("$"+fake+"*"+XORChecksum(fake))
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			dataGPS = parsed.(nmea.GGA)
+			log.Println("the GPS returned invalid data so sending a fake one")
+		}
+		// When HDOP precision is set,
+		// skip sending anything below the threshold.
+		if HDOP != -1 {
+			if dataGPS.HDOP >= HDOP {
+				if debug {
+					log.Printf("skip sending low accuracy GPS accuracy threshold:%v  data:%v", HDOP, dataGPS)
+				}
+				continue
+			}
+		}
+
 		dataLora := hex.EncodeToString([]byte(strconv.FormatFloat(dataGPS.Latitude, 'f', -1, 64) + "," + strconv.FormatFloat(dataGPS.Longitude, 'f', -1, 64)))
 		if debug {
-			log.Printf("%v:trying to send the gps data:%v \n", attempt, dataGPS)
+			log.Printf("%v:trying to send gps data:%v \n", attempt, dataGPS)
 		}
 		resp, err := lora.Send("0,1," + dataLora)
 		if err != nil {
@@ -83,12 +112,17 @@ func main() {
 			continue
 		}
 
+		signal, err := lora.Signal()
+		if err != nil {
+			log.Println("failed to get last packet signal info err:", err)
+		}
+
 		if resp == rak811.STATUS_TX_COMFIRMED {
-			log.Println("STATUS_TX_COMFIRMED send response")
+			log.Println("STATUS_TX_COMFIRMED response received, signal:", signal)
 			attempt = 1
 		}
 		if resp == rak811.STATUS_TX_UNCOMFIRMED {
-			log.Println("unconfirmed data sent data:",dataGPS)
+			log.Println("STATUS_TX_UNCOMFIRMED response received, signal:", signal)
 			attempt = 1
 		}
 	}
@@ -118,23 +152,6 @@ func startGPS(debug bool, HDOP float64) (chan nmea.GGA, error) {
 			}
 			if parsed.DataType() == nmea.TypeGGA {
 				dataGPS := parsed.(nmea.GGA)
-				// Send only GPS data if it is valid.
-				if dataGPS.FixQuality == nmea.Invalid {
-					if debug {
-						log.Println("skip sending invalid GPS data", dataGPS)
-					}
-					continue
-				}
-				// When HDOP precision is set,
-				// skip sending anything below the pricions level.
-				if HDOP != -1 {
-					if dataGPS.HDOP >= HDOP {
-						if debug {
-							log.Printf("skip sending low accuracy GPS accuracy threshold:%v  data:%v", HDOP, dataGPS)
-						}
-						continue
-					}
-				}
 				select {
 				case respChan <- dataGPS: // Don't block when the reciver is not ready.
 				default:
@@ -196,7 +213,7 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 	}
 	log.Println("lora module mode set resp:", resp)
 
-	config := "dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
+	config := "pwr_level:7" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
 	resp, err = lora.SetConfig(config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "set lora config with:%v", config)
