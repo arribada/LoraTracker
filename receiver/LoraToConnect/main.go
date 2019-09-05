@@ -20,9 +20,20 @@ import (
 	"github.com/brocaar/lorawan"
 	"github.com/pkg/errors"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/wkt"
 	"gopkg.in/alecthomas/kingpin.v2"
+)
+
+var coordinates = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "coordinates",
+		Help: "GPS longitude and altitude.",
+	},
+	[]string{"vector"},
 )
 
 func main() {
@@ -48,6 +59,7 @@ func main() {
 		log.Println("displaying debug logs")
 	}
 	http.Handle("/", handler)
+	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":"+*receivePort, nil))
 
 }
@@ -161,8 +173,14 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
-	devID := genDevID(data)
 	var err error
+	lat, long, err := parseCoordinates(string(data.Data))
+	if err != nil {
+		return err
+	}
+	coordinates.WithLabelValues("latitude").Set(lat)
+	coordinates.WithLabelValues("longitude").Set(long)
+	devID := genDevID(data)
 	alertID, ok := s.alertIDBuf[devID]
 	if !ok {
 		alertID, err = s.alertID(devID)
@@ -187,29 +205,6 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 
 	url := s.server + "/server/api/connectalert/" + genDevID(data)
 
-	coordinates := strings.Split(string(data.Data), ",")
-	if len(coordinates) < 2 {
-		return errors.New("parsing the cordinates string")
-
-	}
-
-	latitude, err := strconv.ParseFloat(coordinates[0], 64)
-	if err != nil {
-		return errors.Errorf("parsing the latitude string err:%v", err)
-
-	}
-	if latitude < -90 || latitude > 90 {
-		return errors.New("latitude outside acceptable values")
-	}
-	longitude, err := strconv.ParseFloat(coordinates[0], 64)
-	if err != nil {
-		return errors.Errorf("parsing the longitude string err:%v", err)
-
-	}
-	if longitude < -180 || longitude > 180 {
-		return errors.New("longitude outside acceptable values")
-	}
-
 	var jsonStr = []byte(`
 	{
 		"type":"FeatureCollection",
@@ -218,7 +213,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 				"type":"Feature",
 				"geometry":	{
 					"type":"Point",
-					"coordinates":["` + coordinates[1] + `","` + coordinates[0] + `"]
+					"coordinates":["` + strconv.FormatFloat(long, 'f', -1, 64) + `","` + strconv.FormatFloat(lat, 'f', -1, 64) + `"]
 				},
 				"properties":{
 					"deviceId":"` + devID + `",
@@ -490,6 +485,31 @@ func (s *Handler) createAlertType(label string) (string, error) {
 
 func genDevID(data *DataUpPayload) string {
 	return data.DeviceName + "-" + data.DevEUI.String()
+}
+func parseCoordinates(raw string) (float64, float64, error) {
+	coordinates := strings.Split(string(raw), ",")
+	if len(coordinates) < 2 {
+		return 0, 0, errors.New("parsing the cordinates string")
+
+	}
+
+	latitude, err := strconv.ParseFloat(coordinates[0], 64)
+	if err != nil {
+		return 0, 0, errors.Errorf("parsing the latitude string err:%v", err)
+
+	}
+	if latitude < -90 || latitude > 90 {
+		return 0, 0, errors.New("latitude outside acceptable values")
+	}
+	longitude, err := strconv.ParseFloat(coordinates[1], 64)
+	if err != nil {
+		return 0, 0, errors.Errorf("parsing the longitude string err:%v", err)
+
+	}
+	if longitude < -180 || longitude > 180 {
+		return 0, 0, errors.New("longitude outside acceptable values")
+	}
+	return latitude, longitude, nil
 }
 
 // DataUpPayload represents a data-up payload.
