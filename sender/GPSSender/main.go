@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -78,8 +77,8 @@ func main() {
 				}
 				continue
 			}
-			fake:="GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
-			parsed, err := nmea.Parse("$"+fake+"*"+XORChecksum(fake))
+			fake := "GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
+			parsed, err := nmea.Parse("$" + fake + "*" + nmea.Checksum(fake))
 			if err != nil {
 				log.Println(err)
 				continue
@@ -175,7 +174,7 @@ func setupGPS(debug bool) (*bufio.Reader, error) {
 	// Full ref: https://cdn-shop.adafruit.com/datasheets/PMTK_A08.pdf
 	// Turn on GGA:
 	command := "PMTK314,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
-	s.Write([]byte("$" + command + "*" + XORChecksum(command) + "\r\n"))
+	s.Write([]byte("$" + command + "*" + nmea.Checksum(command) + "\r\n"))
 
 	if !gerMTKAck(debug, 314, reader) {
 		return nil, errors.New("no cmd ack")
@@ -183,7 +182,7 @@ func setupGPS(debug bool) (*bufio.Reader, error) {
 
 	// Set update rate to once every 10 second (10hz).
 	command = "PMTK220,10000"
-	s.Write([]byte("$" + command + "*" + XORChecksum(command) + "\r\n"))
+	s.Write([]byte("$" + command + "*" + nmea.Checksum(command) + "\r\n"))
 	if !gerMTKAck(debug, 220, reader) {
 		return nil, errors.New("no cmd ack")
 	}
@@ -275,14 +274,4 @@ func gerMTKAck(debug bool, cmdID int64, reader *bufio.Reader) bool {
 		}
 	}
 	return ok
-}
-
-// XORChecksum xor all the bytes in a string an return it
-// as an uppercase hex string
-func XORChecksum(s string) string {
-	var checksum uint8
-	for i := 0; i < len(s); i++ {
-		checksum ^= s[i]
-	}
-	return fmt.Sprintf("%02X", checksum)
 }
