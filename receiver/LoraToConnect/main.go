@@ -34,7 +34,7 @@ var distanceMeters = promauto.NewGaugeVec(
 		Name: "distance_meters",
 		Help: "Distance in meters between the received gps coordinates and the gaetway location.",
 	},
-	[]string{"vector"},
+	[]string{"gateway_id"},
 )
 
 func main() {
@@ -185,7 +185,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	} else {
 		// Distance from each gateway that received this data.
 		for _, gwMeta := range data.RXInfo {
-			distanceMeters.WithLabelValues("gateway_id").Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "M"))
+			distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String()}).Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "M"))
 		}
 	}
 	devID := genDevID(data)
