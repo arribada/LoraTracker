@@ -34,7 +34,7 @@ var distanceMeters = promauto.NewGaugeVec(
 		Name: "distance_meters",
 		Help: "Distance in meters between the received gps coordinates and the gaetway location.",
 	},
-	[]string{"gateway_id"},
+	[]string{"gateway_id", "dev_id"},
 )
 
 func main() {
@@ -180,15 +180,16 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 		return err
 	}
 
+	devID := genDevID(data)
+
 	if len(data.RXInfo) == 0 {
 		log.Println("received lora data doesn't include gateway meta data")
 	} else {
 		// Distance from each gateway that received this data.
 		for _, gwMeta := range data.RXInfo {
-			distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String()}).Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K")*1000)
+			distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": devID}).Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K") * 1000)
 		}
 	}
-	devID := genDevID(data)
 	alertID, ok := s.alertIDBuf[devID]
 	if !ok {
 		alertID, err = s.alertID(devID)
