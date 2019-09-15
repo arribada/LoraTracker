@@ -185,7 +185,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	} else {
 		// Distance from each gateway that received this data.
 		for _, gwMeta := range data.RXInfo {
-			distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String()}).Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "M"))
+			distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String()}).Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K")*1000)
 		}
 	}
 	devID := genDevID(data)
