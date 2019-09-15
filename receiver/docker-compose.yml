@@ -25,6 +25,8 @@ services:
     image: arribada/lora-connect
     ports:
     - "8070:8070"
+    environment:
+      - DEBUG=1
 
   packet-forwarder:
     image: arribada/packet-forwarder
@@ -33,6 +35,9 @@ services:
       - PORT=8090 # The web port on which to show the gateway ID.
       - CONCENTRATOR_RESET_PIN=22
       - GW_HOST=gatewaybridge # Where to send the packets
+      # Use hard coded gateway ID as auto generation used the eth0 mac address 
+      # which changes when the container is recreated.
+      - GW_ID=0242acfffe110006 
     ports:
       - 8090:8090 
   loraserver:
