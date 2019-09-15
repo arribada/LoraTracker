@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/brocaar/lorawan"
@@ -29,12 +30,21 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-var distanceMeters = promauto.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "distance_meters",
-		Help: "Distance in meters between the received gps coordinates and the gaetway location.",
-	},
-	[]string{"gateway_id", "dev_id"},
+var (
+	distanceMeters = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "distance_meters",
+			Help: "Distance in meters between the received gps coordinates and the gaetway location.",
+		},
+		[]string{"gateway_id", "dev_id"},
+	)
+	lastUpdate = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "last_update_seconds",
+			Help: "The time in seconds since the last update.",
+		},
+		[]string{"dev_id"},
+	)
 )
 
 func main() {
@@ -53,43 +63,67 @@ func main() {
 		os.Exit(2)
 	}
 
-	handler := newHandler()
+	alertsHandler := newAlertsHandler()
+
+	alertsHandler.monitorUpdateTimes()
 
 	log.Println("starting server at port:", *receivePort)
 	if os.Getenv("DEBUG") != "" {
 		log.Println("displaying debug logs")
 	}
-	http.Handle("/", handler)
+	http.Handle("/", alertsHandler)
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":"+*receivePort, nil))
-
 }
 
-func newHandler() *Handler {
-	return &Handler{
+func newAlertsHandler() *AlertsHandler {
+	return &AlertsHandler{
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		},
-		alertIDBuf: make(map[string]string),
-		careasBuf:  make(map[string]struct{}),
+		allDevIDs: make(map[string]string),
+		careasBuf: make(map[string]struct{}),
 	}
 }
 
-type Handler struct {
+type AlertsHandler struct {
 	server,
 	user,
 	pass,
 	ca string
 	httpClient *http.Client
-	// alertIDBuf is used to reduce the API calls.
-	alertIDBuf map[string]string
-	// careasBuf is used to reduce the API calls.
+	// allDevIDs is used to reduce the SMART connect API calls
+	// when checking if an alert type exists.
+	allDevIDs map[string]string
+	// careasBuf is used to reduce the SMART connect API calls
+	// when checking is CA area exists.
 	careasBuf map[string]struct{}
+	mtx       sync.Mutex
 }
 
-func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// monitorUpdateTimes increases the update time to detect when a device has lost a signal.
+func (s *AlertsHandler) monitorUpdateTimes() {
+	go func() {
+		t := time.NewTicker(time.Second).C
+		for {
+			select {
+			case <-t:
+				s.mtx.Lock()
+				for devID := range s.allDevIDs {
+					lastUpdate.With(prometheus.Labels{"dev_id": devID}).Inc()
+				}
+				s.mtx.Unlock()
+			}
+		}
+	}()
+}
+func (s *AlertsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.Error(w, "unimplemented path:"+r.URL.Path, http.StatusNotImplemented)
+		return
+	}
 	c, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Println("reading request body err:", err)
@@ -173,7 +207,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
+func (s *AlertsHandler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
 	var err error
 	lat, long, err := parseCoordinates(string(data.Data))
 	if err != nil {
@@ -188,9 +222,14 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 		// Distance from each gateway that received this data.
 		for _, gwMeta := range data.RXInfo {
 			distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": devID}).Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K") * 1000)
+			lastUpdate.With(prometheus.Labels{"dev_id": devID}).Set(0)
 		}
 	}
-	alertID, ok := s.alertIDBuf[devID]
+
+	// When the device id is present in all alerts map this guarantees that
+	// the alert type exists so no need to create it.
+	s.mtx.Lock()
+	alertID, ok := s.allDevIDs[devID]
 	if !ok {
 		alertID, err = s.alertID(devID)
 		if err != nil {
@@ -204,13 +243,9 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 				return fmt.Errorf("creating a new alertType for devID:%v err:%v", devID, err)
 			}
 		}
-
-		// Reset the buffer if too big.
-		if len(s.alertIDBuf) > 100 {
-			s.alertIDBuf = make(map[string]string)
-		}
-		s.alertIDBuf[devID] = alertID
+		s.allDevIDs[devID] = alertID
 	}
+	s.mtx.Unlock()
 
 	url := s.server + "/server/api/connectalert/" + genDevID(data)
 
@@ -279,7 +314,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	return nil
 }
 
-func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
+func (s *AlertsHandler) createPatrolUpload(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
 	geo, err := wkt.Marshal(geom.NewPoint(geom.XY).MustSetCoords(geom.Coord{1, 2}))
 	if err != nil {
 		return fmt.Errorf("marshal geo location err:%v", err)
@@ -362,7 +397,7 @@ func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, dat
 	return nil
 }
 
-func (s *Handler) careaExists(ca string) (bool, error) {
+func (s *AlertsHandler) careaExists(ca string) (bool, error) {
 	url := s.server + "/server/api/conservationarea"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -393,7 +428,7 @@ func (s *Handler) careaExists(ca string) (bool, error) {
 	return strings.Contains(string(body), `"uuid":"`+s.ca+`"`), nil
 }
 
-func (s *Handler) createCarea(data *DataUpPayload) error {
+func (s *AlertsHandler) createCarea(data *DataUpPayload) error {
 	url := s.server + "/server/api/conservationarea?cauuid=" + s.ca + "&name=" + data.ApplicationName
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -414,7 +449,7 @@ func (s *Handler) createCarea(data *DataUpPayload) error {
 	return nil
 }
 
-func (s *Handler) alertID(devID string) (string, error) {
+func (s *AlertsHandler) alertID(devID string) (string, error) {
 	url := s.server + "/server/api/connectalert/alertTypes"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -451,7 +486,7 @@ func (s *Handler) alertID(devID string) (string, error) {
 	return "", nil
 }
 
-func (s *Handler) createAlertType(label string) (string, error) {
+func (s *AlertsHandler) createAlertType(label string) (string, error) {
 	url := s.server + "/server/api/connectalert/alertTypes/" + label
 
 	var jsonStr = []byte(`
