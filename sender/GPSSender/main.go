@@ -66,6 +66,10 @@ func main() {
 	}
 
 	attempt := 1
+	fake := "GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
+	parsed, err := nmea.Parse("$" + fake + "*" + nmea.Checksum(fake))
+	// Set an initial GPS to the fake ones and than will be overwritten by the first available GPS coordinates.
+	var lastGPSdata nmea.GGA = parsed.(nmea.GGA)
 	for {
 		dataGPS := <-respChan
 
@@ -77,13 +81,12 @@ func main() {
 				}
 				continue
 			}
-			fake := "GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
-			parsed, err := nmea.Parse("$" + fake + "*" + nmea.Checksum(fake))
+
 			if err != nil {
 				log.Println(err)
 				continue
 			}
-			dataGPS = parsed.(nmea.GGA)
+			dataGPS = lastGPSdata
 			log.Println("the GPS returned invalid data so sending a fake one")
 		}
 		// When HDOP precision is set,
@@ -96,6 +99,8 @@ func main() {
 				continue
 			}
 		}
+
+		lastGPSdata = dataGPS
 
 		dataLora := hex.EncodeToString([]byte(strconv.FormatFloat(dataGPS.Latitude, 'f', -1, 64) + "," + strconv.FormatFloat(dataGPS.Longitude, 'f', -1, 64)))
 		if debug {
