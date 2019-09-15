@@ -98,7 +98,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if os.Getenv("DEBUG") != "" {
-		log.Println("incoming request body:", string(c))
+		log.Println("incoming request body:", string(c), "RemoteAddr:", r.RemoteAddr)
 	}
 
 	data := &DataUpPayload{}
