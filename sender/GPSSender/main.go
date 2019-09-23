@@ -34,19 +34,19 @@ func main() {
 		HDOP = h
 		log.Println("set to skip gps data with  accuracy below HDOP:", HDOP)
 	}
-	appKey := os.Getenv("app_key")
+	appKey := os.Getenv("APP_KEY")
 	if appKey == "" {
-		log.Fatal("missing app_key env variable")
+		log.Fatal("missing APP_KEY env variable")
 	}
 	if len(appKey) != 32 {
-		log.Fatalf("app_kee should be 32 char long, app key length:%v", len(appKey))
+		log.Fatalf("APP_KEY should be 32 char long, app key length:%v", len(appKey))
 	}
-	devEUI := os.Getenv("dev_eui")
+	devEUI := os.Getenv("DEV_EUI")
 	if appKey == "" {
-		log.Fatal("missing dev_eui env variable")
+		log.Fatal("missing DEV_EUI env variable")
 	}
 	if len(devEUI) != 16 {
-		log.Fatalf("dev_eui should be 16 char long, app key length:%v", len(devEUI))
+		log.Fatalf("DEV_EUI should be 16 char long, app key length:%v", len(devEUI))
 	}
 
 	if debug {

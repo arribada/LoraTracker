@@ -7,5 +7,5 @@ Env Vars
 SEND_FAKE_GPS - when the gps cannot locate signal send some fake gps to test the lora connection.
 DEBUG=1 - enable debug logging.
 HDOP - set a minimum HDOP accuracy level. Usually anything below 1.50 is good
-app_key - required lora server app key
-dev_eui - required lora server dev key
+APP_KEY - required lora server app key
+DEV_EUI - required lora server dev key
