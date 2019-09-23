@@ -1,17 +1,83 @@
 version: "2.1"
 
 services:
+  env-config:
+    image: arribada/env-config
+    volumes:
+    - configs:/configs/
+    command:
+        - --dir=/configs/
+    environment:
+      PROMETHEUS_CONFIG: |-
+        global:
+          scrape_interval:     5s
+        scrape_configs:
+          - job_name: 'lora-connect'
+            static_configs:
+            - targets: ['lora-connect:8070']
+        alerting:
+          alertmanagers:
+          - static_configs:
+            - targets:
+                - localhost:9093
+        rule_files:
+            - /configs/PROMETHEUS_ALERTING
+      PROMETHEUS_ALERTING: |-
+        groups:
+        - name: /etc/prometheus/alert.rules
+          rules:
+          - alert: GPSNoUpdate
+            expr: last_update_seconds>6000
+            labels:
+              severity: "critical"
+            annotations:
+              summary: \"GPS tracker hasn't sent data\"
+          - alert: GPSPerimeterBreach
+            expr: max_over_time(distance_meters[5m])>100
+            labels:
+              severity: "critical"
+            annotations:
+              summary: \"GPS tracker parameter threshold\"
+      ALERTMANAGER_CONFIG: |-
+        route:
+          receiver: 'krasi'
+          routes:
+          - match:
+                alertname: GPSPerimeterBreach
+          - match:
+                alertname: GPSNoUpdate
+        receivers:
+        - name: 'krasi'
+          pagerduty_configs:
+          - routing_key: $ROUTING_KEY
+      INIT_LORASERVER: |-
+        #!/bin/bash
+        set -e
+
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+          create role loraserver_ns with login password 'loraserver_ns';
+          create database loraserver_ns with owner loraserver_ns;
+        EOSQL
+
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+          create role loraserver_as with login password 'loraserver_as';
+          create database loraserver_as with owner loraserver_as;
+        EOSQL
+
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname="loraserver_as" <<-EOSQL
+          create extension pg_trgm;
+        EOSQL
+
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname="loraserver_as" <<-EOSQL
+          create extension hstore;
+        EOSQL
   smart-postgres:
     image: arribada/smart-connect-postgis:v0.0.1
     environment:
-      POSTGRES_USER: $POSTGRES_USER # The username is also used for the db name.
-      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
     volumes:
     - smart-postgres:/var/lib/postgresql/data
   smart-connect:
     image: arribada/smart-connect:v0.0.1
-    depends_on:
-      - smart-postgres
     ports:
     - "8443:8443"
     volumes:
@@ -19,62 +85,252 @@ services:
     environment:
       POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: $POSTGRES_USER
-      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
   lora-connect:
     image: arribada/lora-connect
     ports:
     - "8070:8070"
-    environment:
-      - DEBUG=1
-
   packet-forwarder:
     image: arribada/packet-forwarder
     privileged: true
     environment:
-      - PORT=8090 # The web port on which to show the gateway ID.
-      - CONCENTRATOR_RESET_PIN=22
-      - GW_HOST=gatewaybridge # Where to send the packets
-      # Use hard coded gateway ID as auto generation used the eth0 mac address 
-      # which changes when the container is recreated.
-      - GW_ID=0242acfffe110006 
-    ports:
-      - 8090:8090 
+      CONCENTRATOR_RESET_PIN: 22
+      CONCENTRATOR_CONFIG: |-
+        {
+          "SX1301_conf": {
+              "lorawan_public": true,
+              "clksrc": 1,
+              "antenna_gain": 0,
+              "radio_0": {
+                  "enable": true,
+                  "type": "SX1257",
+                  "freq": 867500000,
+                  "rssi_offset": -166.0,
+                  "tx_enable": true,
+                  "tx_freq_min": 863000000,
+                  "tx_freq_max": 870000000
+              },
+              "radio_1": {
+                  "enable": true,
+                  "type": "SX1257",
+                  "freq": 868500000,
+                  "rssi_offset": -166.0,
+                  "tx_enable": false
+              },
+              "chan_multiSF_0": {
+                  "enable": true,
+                  "radio": 1,
+                  "if": -400000
+              },
+              "chan_multiSF_1": {
+                  "enable": true,
+                  "radio": 1,
+                  "if": -200000
+              },
+              "chan_multiSF_2": {
+                  "enable": true,
+                  "radio": 1,
+                  "if": 0
+              },
+              "chan_multiSF_3": {
+                  "enable": true,
+                  "radio": 0,
+                  "if": -400000
+              },
+              "chan_multiSF_4": {
+                  "enable": true,
+                  "radio": 0,
+                  "if": -200000
+              },
+              "chan_multiSF_5": {
+                  "enable": true,
+                  "radio": 0,
+                  "if": 0
+              },
+              "chan_multiSF_6": {
+                  "enable": true,
+                  "radio": 0,
+                  "if": 200000
+              },
+              "chan_multiSF_7": {
+                  "enable": true,
+                  "radio": 0,
+                  "if": 400000
+              },
+              "chan_Lora_std": {
+                  "enable": true,
+                  "radio": 1,
+                  "if": -200000,
+                  "bandwidth": 250000,
+                  "spread_factor": 7
+              },
+              "chan_FSK": {
+                  "enable": true,
+                  "radio": 1,
+                  "if": 300000,
+                  "bandwidth": 125000,
+                  "datarate": 50000
+              },
+              "tx_lut_0": {
+                  "pa_gain": 0,
+                  "mix_gain": 8,
+                  "rf_power": -6,
+                  "dig_gain": 0
+              },
+              "tx_lut_1": {
+                  "pa_gain": 0,
+                  "mix_gain": 10,
+                  "rf_power": -3,
+                  "dig_gain": 0
+              },
+              "tx_lut_2": {
+                  "pa_gain": 0,
+                  "mix_gain": 12,
+                  "rf_power": 0,
+                  "dig_gain": 0
+              },
+              "tx_lut_3": {
+                  "pa_gain": 1,
+                  "mix_gain": 8,
+                  "rf_power": 3,
+                  "dig_gain": 0
+              },
+              "tx_lut_4": {
+                  "pa_gain": 1,
+                  "mix_gain": 10,
+                  "rf_power": 6,
+                  "dig_gain": 0
+              },
+              "tx_lut_5": {
+                  "pa_gain": 1,
+                  "mix_gain": 12,
+                  "rf_power": 10,
+                  "dig_gain": 0
+              },
+              "tx_lut_6": {
+                  "pa_gain": 1,
+                  "mix_gain": 13,
+                  "rf_power": 11,
+                  "dig_gain": 0
+              },
+              "tx_lut_7": {
+                  "pa_gain": 2,
+                  "mix_gain": 9,
+                  "rf_power": 12,
+                  "dig_gain": 0
+              },
+              "tx_lut_8": {
+                  "pa_gain": 1,
+                  "mix_gain": 15,
+                  "rf_power": 13,
+                  "dig_gain": 0
+              },
+              "tx_lut_9": {
+                  "pa_gain": 2,
+                  "mix_gain": 10,
+                  "rf_power": 14,
+                  "dig_gain": 0
+              },
+              "tx_lut_10": {
+                  "pa_gain": 2,
+                  "mix_gain": 11,
+                  "rf_power": 16,
+                  "dig_gain": 0
+              },
+              "tx_lut_11": {
+                  "pa_gain": 3,
+                  "mix_gain": 9,
+                  "rf_power": 20,
+                  "dig_gain": 0
+              }
+          },
+
+          "gateway_conf": {
+              "gateway_ID": "0242acfffe110006",
+              "server_address": "gatewaybridge",
+              "serv_port_up": 1700,
+              "serv_port_down": 1700,
+              "keepalive_interval": 10,
+              "stat_interval": 30,
+              "push_timeout_ms": 100,
+              "forward_crc_valid": true,
+              "forward_crc_error": false,
+              "forward_crc_disabled": false,
+              #"gps_tty_path": "/dev/ttyAMA0",
+              "beacon_period": 128,
+              "beacon_freq_hz": 869525000,
+              "beacon_datarate": 9,
+              "beacon_bw_hz": 125000,
+              "beacon_power": 14,
+              "beacon_infodesc": 0
+          }
+        }
   loraserver:
     image: arribada/loraserver
-    depends_on:
-      - postgresql
-
+    environment:
+      - POSTGRESQL.DSN=postgres://loraserver_ns:loraserver_ns@postgresql/loraserver_ns?sslmode=disable
+      - REDIS.URL=redis://redis:6379
+      - NETWORK_SERVER.BAND.NAME=EU_863_870
+      - NETWORK_SERVER.GATEWAY.BACKEND.MQTT.SERVER=tcp://mosquitto:1883
+      - JOIN_SERVER.DEFAULT.SERVER=http://appserver:8003
+      - GEOLOCATION_SERVER.SERVER=geoserver:8005
   appserver:
     image: arribada/lora-app-server
-    depends_on:
-      - postgresql
     ports:
       - 8080:8080
-
+    environment:
+      - POSTGRESQL.DSN=postgres://loraserver_as:loraserver_as@postgresql/loraserver_as?sslmode=disable
+      - REDIS.URL=redis://redis:6379
+      - APPLICATION_SERVER.INTEGRATION.MQTT.SERVER=tcp://mosquitto:1883
+      - APPLICATION_SERVER.API.PUBLIC_HOST=appserver:8001
+      - APPLICATION_SERVER.EXTERNAL_API.JWT_SECRET=$JWT_SECRET
   gatewaybridge:
     image: arribada/lora-gateway-bridge
-
+    ports:
+      - 1700:1700/udp
+    environment:
+      - INTEGRATION.MQTT.AUTH.GENERIC.SERVER=tcp://mosquitto:1883
   geoserver:
     image: arribada/lora-geo-server
-
+    environment:
+      - GEO_SERVER.BACKEND.NAME=collos
   postgresql:
-    image: arribada/loraserver-postgres
+    depends_on:
+      - env-config
+    image: postgres:9.6-alpine
     volumes:
+      - configs:INIT_LORASERVER:/docker-entrypoint-initdb.d/init.sh
       - lora-postgres:/var/lib/postgresql/data
-
   redis:
     image: redis:5-alpine
     volumes:
       - lora-redis:/data
-
   mosquitto:
     image: eclipse-mosquitto
+
+  prometheus:
+    image: prom/prometheus
+    depends_on:
+      - env-config
+    volumes:
+    - configs:/configs/
     ports:
-      - 1883:1883
+      - 9090:9090
+    command:
+      - --config.file=/configs/PROMETHEUS_CONFIG
+  alertmanager:
+    image: prom/alertmanager
+    depends_on:
+      - env-config
+    volumes:
+    - configs:/configs/
+    ports:
+      - 9093:9093
+    command:
+      - --config.file=/configs/ALERTMANAGER_CONFIG
 
 volumes:
-  smart-postgres:
-  smart-connect:
-  lora-postgres:
-  lora-redis:
+  # smart-postgres:
+  # smart-connect:
+  # lora-postgres:
+  # lora-redis:
+  configs:
