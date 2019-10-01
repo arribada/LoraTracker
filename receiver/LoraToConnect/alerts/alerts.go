@@ -202,9 +202,11 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	// the alert type exists so no need to create it.
 	s.mtx.Lock()
 	alertID, ok := s.allDevIDs[devID]
+	s.mtx.Unlock()
 	if !ok {
 		alertID, err = s.alertID(devID)
 		if err != nil {
+
 			return fmt.Errorf("getting the alert id by the device devID err:%v", err)
 		}
 		// AlertID with this devID doesn't exists so need to create it.
@@ -215,9 +217,10 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 				return fmt.Errorf("creating a new alertType for devID:%v err:%v", devID, err)
 			}
 		}
+		s.mtx.Lock()
 		s.allDevIDs[devID] = alertID
+		s.mtx.Unlock()
 	}
-	s.mtx.Unlock()
 
 	url := s.server + "/server/api/connectalert/" + genDevID(data)
 
