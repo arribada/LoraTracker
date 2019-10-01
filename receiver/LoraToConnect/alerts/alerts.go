@@ -26,7 +26,6 @@ import (
 	"github.com/twpayne/go-geom/encoding/wkt"
 )
 
-
 func NewHandler() *Handler {
 	a := &Handler{
 		httpClient: &http.Client{
@@ -89,6 +88,9 @@ func (s *Handler) incLastUpdateTime() {
 	}()
 }
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		log.Printf("response %+v \n", w.Header())
+	}()
 	if r.URL.Path != "/" {
 		http.Error(w, "unimplemented path:"+r.URL.Path, http.StatusNotImplemented)
 		return
@@ -102,6 +104,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if os.Getenv("DEBUG") != "" {
 		log.Println("incoming request body:", string(c), "RemoteAddr:", r.RemoteAddr)
+		log.Printf("incoming request headers:%+v\n", r.Header)
 	}
 
 	data := &DataUpPayload{}
