@@ -88,9 +88,6 @@ func (s *Handler) incLastUpdateTime() {
 	}()
 }
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		log.Printf("response %+v \n", w.Header())
-	}()
 	if r.URL.Path != "/" {
 		http.Error(w, "unimplemented path:"+r.URL.Path, http.StatusNotImplemented)
 		return
@@ -471,7 +468,7 @@ func (s *Handler) createAlertType(label string) (string, error) {
 		"opacity":".80",
 		"markerIcon":"car",
 		"markerColor":"black",
-		"spin":"false",
+		"spin":"false"
 	  }`)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
 	if err != nil {
@@ -485,11 +482,15 @@ func (s *Handler) createAlertType(label string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("reading the response body err:", err)
+	}
 	if resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("invalid status code response:%v", resp.Status)
+		return "", fmt.Errorf("invalid status code:%v body:%v request:%v", resp.Status, body, jsonStr)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
