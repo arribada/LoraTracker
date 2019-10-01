@@ -490,15 +490,10 @@ func (s *Handler) createAlertType(label string) (string, error) {
 		return "", fmt.Errorf("invalid status code:%v body:%v request:%v", resp.Status, body, jsonStr)
 	}
 
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
 	response := &SMARTAlertType{}
 	err = json.Unmarshal(body, response)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("unmarshal the response reply err:%v , response body:%v", err, body)
 	}
 	return response.UUID, nil
 }
