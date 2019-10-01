@@ -26,6 +26,7 @@ import (
 	"github.com/twpayne/go-geom/encoding/wkt"
 )
 
+// NewHandler creates a new alert type handler.
 func NewHandler() *Handler {
 	a := &Handler{
 		httpClient: &http.Client{
@@ -54,6 +55,7 @@ func NewHandler() *Handler {
 	return a
 }
 
+// Handler is the alert type handler struct.
 type Handler struct {
 	server,
 	user,
@@ -87,52 +89,55 @@ func (s *Handler) incLastUpdateTime() {
 		}
 	}()
 }
+
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		http.Error(w, "unimplemented path:"+r.URL.Path, http.StatusNotImplemented)
+		s.httpError(w, "unimplemented path:"+r.URL.Path, http.StatusNotImplemented)
 		return
 	}
 	c, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Println("reading request body err:", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.httpError(w, "reading request body err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if os.Getenv("DEBUG") != "" {
-		log.Println("incoming request body:", string(c), "RemoteAddr:", r.RemoteAddr)
-		log.Printf("incoming request headers:%+v\n", r.Header)
+		log.Printf("incoming request body:%v RemoteAddr:%v headers:%+v \n", string(c), r.RemoteAddr, r.Header)
 	}
 
 	data := &DataUpPayload{}
 	err = json.Unmarshal(c, data)
 	if err != nil {
-		log.Println("unmarshaling request body err:", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.httpError(w, "unmarshaling request body err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	server, ok := r.Header["Smartserver"]
 	if !ok || len(server) != 1 {
-		http.Error(w, "missing or incorrect Smartserver header", http.StatusBadRequest)
+		s.httpError(w, "missing or incorrect SmartServer header", http.StatusBadRequest)
+		return
 	}
 
 	_, err = url.ParseRequestURI(server[0])
 	if err != nil {
-		http.Error(w, "invalid Smartserver url format expected: https://serverNameOrIP", http.StatusBadRequest)
+		s.httpError(w, "invalid SmartServer url format expected: https://serverNameOrIP", http.StatusBadRequest)
+		return
 	}
 
 	user, ok := r.Header["Smartuser"]
 	if !ok || len(user) != 1 {
-		http.Error(w, "missing or incorrect Smartuser header", http.StatusBadRequest)
+		s.httpError(w, "missing or incorrect SmartUser header", http.StatusBadRequest)
+		return
 	}
 	pass, ok := r.Header["Smartpass"]
 	if !ok || len(pass) != 1 {
-		http.Error(w, "missing or incorrect Smartpass header", http.StatusBadRequest)
+		s.httpError(w, "missing or incorrect SmartPass header", http.StatusBadRequest)
+		return
 	}
 	carea, ok := r.Header["Smartcarea"]
 	if !ok || len(carea) != 1 {
-		http.Error(w, "missing or incorrect Smartcarea header", http.StatusBadRequest)
+		s.httpError(w, "missing or incorrect SmartCarea header", http.StatusBadRequest)
+		return
 	}
 
 	s.server = server[0]
@@ -143,14 +148,11 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.careasBuf[carea[0]]; !ok {
 		exists, err := s.careaExists(carea[0])
 		if err != nil {
-			http.Error(w, "checking if a  conservation area exists, err:"+err.Error(), http.StatusBadRequest)
+			s.httpError(w, "checking if a  conservation area exists, err:"+err.Error(), http.StatusBadRequest)
 			return
 		}
 		if !exists {
-			if os.Getenv("DEBUG") != "" {
-				log.Println("CA area doesn't exist uuid:", s.ca)
-			}
-			http.Error(w, "conservation area doesn't exist", http.StatusNotFound)
+			s.httpError(w, "conservation area doesn't exist", http.StatusNotFound)
 			return
 		}
 
@@ -162,15 +164,13 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.createAlert(w, r, data); err != nil {
-		log.Println("creating an alert err:", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		s.httpError(w, "creating an alert err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 	log.Println("alert created for application:", data.ApplicationName, ",device id:", genDevID(data))
 
 	// if err := s.createPatrolUpload(w, r, data); err != nil {
-	// 	log.Println("creating an upload err:", err)
-	// 	http.Error(w, err.Error(), http.StatusBadRequest)
+	// 	s.httpError(w,"creating an upload err:"+ err.Error(), http.StatusBadRequest)
 	// }
 	// log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
 	w.WriteHeader(http.StatusOK)
@@ -498,6 +498,11 @@ func (s *Handler) createAlertType(label string) (string, error) {
 	return response.UUID, nil
 }
 
+func (s *Handler) httpError(w http.ResponseWriter, error string, code int) {
+	log.Println(error)
+	http.Error(w, error, code)
+}
+
 func genDevID(data *DataUpPayload) string {
 	return data.DeviceName + "-" + data.DevEUI.String()
 }
@@ -567,6 +572,7 @@ type Location struct {
 	Altitude  float64 `json:"altitude"`
 }
 
+// SMARTAlertType details.
 type SMARTAlertType struct {
 	UUID     string `json:"uuid"`
 	TypeUUID string `json:"typeUuid"`
