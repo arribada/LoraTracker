@@ -3,8 +3,8 @@
 
 
 TODO:
+ - test adding a new device 
  - make a video how to add new devices.
- - Update schematics to add prom am and pager duty.
  - remove the workaround for the dots in the env variables and remove from loraserver images and EnvToFile.
  - create an orb for setting up a working buildx env
  - update the same partol with new gps coordinates
