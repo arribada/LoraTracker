@@ -2,13 +2,13 @@ version: "2.1"
 
 services:
   env-config:
-    image: arribada/env-config
+    image: arribada/env-config@sha256:63cc992847d8e378190d88dc21390f09337fd1102ccdb65d9aefd26846444b61
     volumes:
     - configs:/configs/
     command:
         - --dir=/configs/
     environment:
-      PROMETHEUS_CONFIG: |-
+      PROMETHEUS__CONFIG: |-
         global:
           scrape_interval:     5s
         scrape_configs:
@@ -19,10 +19,10 @@ services:
           alertmanagers:
           - static_configs:
             - targets:
-                - localhost:9093
+                - alertmanager:9093
         rule_files:
             - /configs/PROMETHEUS_ALERTING
-      PROMETHEUS_ALERTING: |-
+      PROMETHEUS__ALERTING: |-
         groups:
         - name: /etc/prometheus/alert.rules
           rules:
@@ -33,12 +33,12 @@ services:
             annotations:
               summary: \"GPS tracker hasn't sent data\"
           - alert: GPSPerimeterBreach
-            expr: max_over_time(distance_meters[5m])>100
+            expr: max_over_time(distance_meters[1m])>1000
             labels:
               severity: "critical"
             annotations:
               summary: \"GPS tracker parameter threshold\"
-      ALERTMANAGER_CONFIG: |-
+      ALERTMANAGER__CONFIG: |-
         route:
           receiver: 'krasi'
           routes:
@@ -50,7 +50,7 @@ services:
         - name: 'krasi'
           pagerduty_configs:
           - routing_key: $ROUTING_KEY
-      INIT_LORASERVER: |-
+      INIT__LORASERVER_sh: |-
         #!/bin/bash
         set -e
 
@@ -72,12 +72,11 @@ services:
           create extension hstore;
         EOSQL
   smart-postgres:
-    image: arribada/smart-connect-postgis:v0.0.1
-    environment:
+    image: arribada/smart-connect-postgis@sha256:96787a45e1146ac3cd88cad15aa89243d74738e574e6b9730a07415616e3e521
     volumes:
     - smart-postgres:/var/lib/postgresql/data
   smart-connect:
-    image: arribada/smart-connect:v0.0.1
+    image: arribada/smart-connect@sha256:da4b79c840bd354d8ccf1d6afe94eefe8fa64bc561f110a3d7684add6b0c4709
     ports:
     - "8443:8443"
     volumes:
@@ -86,11 +85,13 @@ services:
       POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
   lora-connect:
-    image: arribada/lora-connect
-    ports:
-    - "8070:8070"
+    image: arribada/lora-connect@sha256:150debfe7bf63e854861316eddbfcdff34b85973ab02c89a79ad0365e40085ac
+    # ports:
+    # - "8070:8070"
   packet-forwarder:
-    image: arribada/packet-forwarder
+    image: arribada/packet-forwarder@sha256:899d4fe181c785a376ea9c441e5220f4256966012a5f8ce9a194a7a983ce170e
+    depends_on:
+      - gatewaybridge
     privileged: true
     environment:
       CONCENTRATOR_RESET_PIN: 22
@@ -255,7 +256,6 @@ services:
               "forward_crc_valid": true,
               "forward_crc_error": false,
               "forward_crc_disabled": false,
-              #"gps_tty_path": "/dev/ttyAMA0",
               "beacon_period": 128,
               "beacon_freq_hz": 869525000,
               "beacon_datarate": 9,
@@ -265,64 +265,73 @@ services:
           }
         }
   loraserver:
-    image: arribada/loraserver
+    image: arribada/loraserver@sha256:99051299b1a734a1b56093336f0f2fd3b0db6672fe562a2ff5c9363453f9bfaa
+    depends_on:
+      - postgresql
+      - mosquitto
     environment:
-      - POSTGRESQL.DSN=postgres://loraserver_ns:loraserver_ns@postgresql/loraserver_ns?sslmode=disable
-      - REDIS.URL=redis://redis:6379
-      - NETWORK_SERVER.BAND.NAME=EU_863_870
-      - NETWORK_SERVER.GATEWAY.BACKEND.MQTT.SERVER=tcp://mosquitto:1883
-      - JOIN_SERVER.DEFAULT.SERVER=http://appserver:8003
-      - GEOLOCATION_SERVER.SERVER=geoserver:8005
+      - REDIS_URL=redis://redis:6379
+      - NETWORK__SERVER_BAND_NAME=EU_863_870
+      - NETWORK__SERVER_GATEWAY_BACKEND_MQTT_SERVER=tcp://mosquitto:1883
+      - JOIN__SERVER_DEFAULT_SERVER=http://appserver:8003
+      - GEOLOCATION__SERVER_SERVER=geoserver:8005
   appserver:
-    image: arribada/lora-app-server
+    image: arribada/lora-app-server@sha256:31878520b836fd78d340a94d90fab1318a790c21b5dbd657f4bbf66e5b5f3db6
+    depends_on:
+      - postgresql
+      - redis
     ports:
       - 8080:8080
     environment:
-      - POSTGRESQL.DSN=postgres://loraserver_as:loraserver_as@postgresql/loraserver_as?sslmode=disable
-      - REDIS.URL=redis://redis:6379
-      - APPLICATION_SERVER.INTEGRATION.MQTT.SERVER=tcp://mosquitto:1883
-      - APPLICATION_SERVER.API.PUBLIC_HOST=appserver:8001
-      - APPLICATION_SERVER.EXTERNAL_API.JWT_SECRET=$JWT_SECRET
+      - REDIS_URL=redis://redis:6379
+      - APPLICATION__SERVER_INTEGRATION_MQTT_SERVER=tcp://mosquitto:1883
+      - APPLICATION__SERVER_API_PUBLIC__HOST=appserver:8001
+      
   gatewaybridge:
-    image: arribada/lora-gateway-bridge
+    image: arribada/lora-gateway-bridge@sha256:eeb2a0d12e2ba706d8dd071938fd3e0d8a7b06254d0748a7504c781b5425af9c
+    depends_on:
+      - mosquitto
     ports:
       - 1700:1700/udp
     environment:
-      - INTEGRATION.MQTT.AUTH.GENERIC.SERVER=tcp://mosquitto:1883
+      - INTEGRATION_MQTT_AUTH_GENERIC_SERVER=tcp://mosquitto:1883
   geoserver:
-    image: arribada/lora-geo-server
+    image: arribada/lora-geo-server@sha256:69534b499347edfba84b2dd778993d3c0de83e435454737501d76cc300cf8249
     environment:
-      - GEO_SERVER.BACKEND.NAME=collos
+      - GEO__SERVER_BACKEND_NAME=collos
   postgresql:
     depends_on:
       - env-config
-    image: postgres:9.6-alpine
+      - mosquitto
+    image: postgres:9.6-alpine@sha256:5f30f64d292adba6834c2acf431660c41514a4bdf3b979e6dd2f9930dcf53175
     volumes:
-      - configs:INIT_LORASERVER:/docker-entrypoint-initdb.d/init.sh
+      - configs:/docker-entrypoint-initdb.d/
       - lora-postgres:/var/lib/postgresql/data
   redis:
-    image: redis:5-alpine
+    image: redis:5-alpine@sha256:f56ac9669267aec516ebfb8d7f61fc6344b7c93d9b24f45e0f952c6f74f36015
     volumes:
       - lora-redis:/data
   mosquitto:
-    image: eclipse-mosquitto
+    image: eclipse-mosquitto@sha256:98b755512a8487877e2e98cbf3ba7a4987bc71d8e1c632d5aa86f43ee7db0e34
 
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus@sha256:ac56e023deb66f2bf25fe103db8c96b927c68239008ac221670b27e9ea4e3956
     depends_on:
       - env-config
     volumes:
     - configs:/configs/
+    - prometheus:/prometheus
     ports:
       - 9090:9090
     command:
       - --config.file=/configs/PROMETHEUS_CONFIG
   alertmanager:
-    image: prom/alertmanager
+    image: prom/alertmanager@sha256:090ffef59d4089b7ff9fba475f3c0bb8e2ceb7351483a054c02fb29c8e004709
     depends_on:
       - env-config
     volumes:
     - configs:/configs/
+    - alertmanager:/alertmanager
     ports:
       - 9093:9093
     command:
@@ -333,4 +342,6 @@ volumes:
   smart-connect:
   lora-postgres:
   lora-redis:
+  prometheus:
+  alertmanager:
   configs:
