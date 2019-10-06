@@ -71,6 +71,8 @@ type Handler struct {
 	mtx            sync.Mutex
 	distanceMeters *prometheus.GaugeVec
 	lastUpdate     *prometheus.GaugeVec
+	rssi           *prometheus.GaugeVec
+	snr            *prometheus.GaugeVec
 }
 
 // incLastUpdateTime increases the update time to detect when a device has lost a signal.
@@ -191,6 +193,8 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 		// Distance from each gateway that received this data.
 		for _, gwMeta := range data.RXInfo {
 			s.distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": devID}).Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K") * 1000)
+			s.rssi.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": devID}).Set(float64(gwMeta.RSSI))
+			s.snr.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": devID}).Set(float64(gwMeta.LoRaSNR))
 			s.lastUpdate.With(prometheus.Labels{"dev_id": devID}).Set(0)
 		}
 	}
