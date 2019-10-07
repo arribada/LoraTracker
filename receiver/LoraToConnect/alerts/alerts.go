@@ -50,6 +50,20 @@ func NewHandler() *Handler {
 			},
 			[]string{"dev_id"},
 		),
+		rssi: promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "rssi",
+				Help: "rssi of the received data.",
+			},
+			[]string{"gateway_id", "dev_id"},
+		),
+		snr: promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "snr",
+				Help: "snr of the received data.",
+			},
+			[]string{"gateway_id", "dev_id"},
+		),
 	}
 	a.incLastUpdateTime()
 	return a
