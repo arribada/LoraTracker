@@ -217,7 +217,7 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 	}
 	log.Println("lora module mode set resp:", resp)
 
-	config := "pwr_level:7" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
+	config := "pwr_level:0" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
 	resp, err = lora.SetConfig(config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "set lora config with:%v", config)
