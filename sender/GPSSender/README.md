@@ -9,3 +9,4 @@ DEBUG=1 - enable debug logging.
 HDOP - set a minimum HDOP accuracy level. Usually anything below 1.50 is good
 APP_KEY - required lora server app key
 DEV_EUI - required lora server dev key
+BAND - set the frequency band. One of:"EU868", "US915", "AU915", "KR920", "AS923"

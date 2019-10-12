@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/adrianmo/go-nmea"
-	"github.com/arribada/rak811"
+	"github.com/arribada/SMARTLoraTracker/sender/GPSSender/pkg/rak811"
 	"github.com/tarm/serial"
 )
 
@@ -216,6 +216,14 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 		return nil, errors.Wrapf(err, "set lora mod")
 	}
 	log.Println("lora module mode set resp:", resp)
+
+	if band := os.Getenv("BAND"); band != "" {
+		resp, err = lora.SetBand(band)
+		if err != nil {
+			return nil, errors.Wrapf(err, "set lora band")
+		}
+		log.Printf("lora module band set resp:%v", resp)
+	}
 
 	config := "pwr_level:0" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
 	resp, err = lora.SetConfig(config)
