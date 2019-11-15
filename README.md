@@ -3,9 +3,9 @@
 
 
 TODO:
- - test adding a new device 
  - make a video how to add new devices.
  - remove the workaround for the dots in the env variables and remove from loraserver images and EnvToFile.
+    - PR the lora  - https://github.com/brocaar/lora-app-server/issues/369
  - update the same partol with new gps coordinates
  - at the end unexpose all ports for services that are not needed.
 
@@ -15,7 +15,7 @@ TODO:
  - Add a phone number under the profile Notification Rules.
  - Create a service.
  - Choose the integration as API V2.
- - copy the `Integration Key` add it as an env vairable with the balena setup.
+ - copy the `Integration Key` add it as an env vairable called `ROUTING_KEY` with the balena setup(see below).
 
 
 # Initial Setup on Balena cloud
@@ -39,6 +39,8 @@ APPLICATION__SERVER_EXTERNAL__API_JWT__SECRET=....
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=...
 ROUTING_KEY=... # The "Integration Key" from Pager Duty for sending  alerts with the alert manager.
+CONCENTRATOR_CONFIG= // The semtech gateway setting. See https://github.com/arribada/packet-forwarder
+NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The default is EU_863_870. For all possible options see https://www.chirpstack.io/network-server
 ```
 
 
@@ -94,7 +96,7 @@ Join (OTAA / ABP): Device supports OTAA
 ```
 name: gpsTracker
 description: gpsTracker
-id:... #look for the gateway_ID in the compose file
+id:... #look for the gateway_ID in the sender's compose file or in the corresponding env variable  if overridden by one. 
 server: gpsTracker
 location: #drag the pin to the current gateway location. This determens when the gps tracker is outside a parimeter and when to send alerts.
 ```
@@ -109,13 +111,13 @@ codec:none
 ```
 name: gpsSender
 description: gpsSender
-EUI: generate random
+EUI: generate random # write it down as it will be used when setting up the sender
 profile: gpsTracker
 ```
 Applications/gpsTracker/Devices/<br/>
 tab: KEYS
 ```
-Application key: generate random
+Application key: generate random # write it down as it will be used when setting up the sender
 ```
 - Applications/gpsTracker/Integrations/Create
 ```
@@ -132,6 +134,7 @@ Uplink data URL: http://lora-connect:8070
 ```
 APP_KEY= // the one set in loraserver
 DEV_EUI= // the one set in loraserver
+BAND= // by default is is set to EU868 , other possible values are: AS923, EU868, AU915, US915, IN865, KR920
 ```
  - Fleet configuration
 ```
@@ -153,3 +156,5 @@ From the balena UI just select `Add a new device` and follow the on screen instr
 
 - Select the latest OS
 - Production image
+
+Now do the initial [Lora Server Setup](#setup-loraserver)
