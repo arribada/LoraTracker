@@ -374,9 +374,10 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 			log.Print("sending join request attempt:", attempt)
 		}
 		resp, err = lora.JoinOTAA()
-		if err != nil {
-			log.Println("Reseting the module due to a join request err:", err)
-			newLoraConnection(devEUI, appKey, debug)
+		if err != nil || attempt > 25 {
+			log.Println("Reseting the module due to a join request err:", err, "or too many attempts:", attempt)
+			lora.Close()
+			return newLoraConnection(devEUI, appKey, debug)
 		}
 
 		if resp == rak811.STATUS_JOINED_SUCCESS {
