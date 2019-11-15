@@ -527,7 +527,7 @@ func genDevID(data *DataUpPayload) string {
 func parseCoordinates(raw string) (float64, float64, error) {
 	coordinates := strings.Split(string(raw), ",")
 	if len(coordinates) < 2 {
-		return 0, 0, errors.New("parsing the cordinates string")
+		return 0, 0, fmt.Errorf("parsing the cordinates string:%v", raw)
 
 	}
 

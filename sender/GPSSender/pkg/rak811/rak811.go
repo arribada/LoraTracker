@@ -219,7 +219,7 @@ func (l *Lora) SetBand(band string) (string, error) {
 	// The firmware returns just OK response when the current band is the new band and
 	// 3 lines response when the new band is different so have a special handle for each case.
 	if strings.Contains(resp, band) {
-		return fmt.Sprintf("current band is already set to:%v so skiping setiting band \n", band), nil
+		return fmt.Sprintf("current band is already set to:%v so skipped setting band \n", band), nil
 	}
 
 	return l.txr(fmt.Sprintf("band=%s", band), 4)
