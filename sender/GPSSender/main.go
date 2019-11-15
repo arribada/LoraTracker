@@ -81,7 +81,7 @@ func main() {
 		// Send only GPS data if it is valid.
 		if dataGPS.FixQuality == nmea.Invalid {
 			invalidCount++
-			if invalidCount > 50 {
+			if invalidCount > 30 {
 				log.Println("reseting the gps module for too many invalid gps fixes:", invalidCount)
 				if err := gps.reset(); err != nil {
 					log.Fatal(err)
