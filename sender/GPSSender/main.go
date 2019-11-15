@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"encoding/hex"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -52,7 +54,7 @@ func main() {
 	if debug {
 		log.Println("enabling gps module")
 	}
-	respChan, err := startGPS(debug, HDOP)
+	gps, err := newGPS(debug, HDOP)
 	if err != nil {
 		log.Fatal("failed to enable gps err:", err)
 	}
@@ -68,22 +70,32 @@ func main() {
 	attempt := 1
 	fake := "GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
 	parsed, err := nmea.Parse("$" + fake + "*" + nmea.Checksum(fake))
+	if err != nil {
+		log.Fatal(err)
+	}
 	// Set an initial GPS to the fake ones and than will be overwritten by the first available GPS coordinates.
 	var lastGPSdata nmea.GGA = parsed.(nmea.GGA)
+	invalidCount := 0
 	for {
-		dataGPS := <-respChan
-
+		dataGPS := <-gps.channel()
 		// Send only GPS data if it is valid.
 		if dataGPS.FixQuality == nmea.Invalid {
+			invalidCount++
+			if invalidCount > 50 {
+				log.Println("reseting the gps module for too many invalid gps fixes:", invalidCount)
+				if err := gps.reset(); err != nil {
+					log.Fatal(err)
+				}
+				gps, err = newGPS(debug, HDOP)
+				if err != nil {
+					log.Fatal("failed to enable gps err:", err)
+				}
+				invalidCount = 0
+			}
 			if os.Getenv("SEND_FAKE_GPS") == "" {
 				if debug {
-					log.Println("skipped sending an invalid data:", dataGPS)
+					log.Println("skipped sending an invalid data:", dataGPS, " count:", invalidCount)
 				}
-				continue
-			}
-
-			if err != nil {
-				log.Println(err)
 				continue
 			}
 			dataGPS = lastGPSdata
@@ -99,14 +111,17 @@ func main() {
 				continue
 			}
 		}
+		invalidCount = 0
 
 		lastGPSdata = dataGPS
 
-		dataLora := hex.EncodeToString([]byte(strconv.FormatFloat(dataGPS.Latitude, 'f', -1, 64) + "," + strconv.FormatFloat(dataGPS.Longitude, 'f', -1, 64)))
+		// The amount of data that can be send is limited by region and dr.
+		// If the received data is empty should increase the dr settings of the lora module.
+		dataLora := []byte(fmt.Sprintf("%.5f", dataGPS.Latitude) + "," + fmt.Sprintf("%.5f", dataGPS.Longitude))
 		if debug {
-			log.Printf("%v:trying to send gps data:%v \n", attempt, dataGPS)
+			log.Printf("%v:trying to send gps GGA:%v lora:%v encoded:%v\n", attempt, dataGPS, string(dataLora), hex.EncodeToString(dataLora))
 		}
-		resp, err := lora.Send("0,1," + dataLora)
+		resp, err := lora.Send("0,1," + hex.EncodeToString(dataLora))
 		if err != nil {
 			log.Println("failed to send data err:", err)
 			// Attempt to register again.
@@ -132,21 +147,37 @@ func main() {
 	}
 }
 
-func startGPS(debug bool, HDOP float64) (chan nmea.GGA, error) {
-	respChan := make(chan nmea.GGA)
+type gps struct {
+	*serial.Port
+	*bufio.Reader
+	ch     chan nmea.GGA
+	debug  bool
+	closed chan struct{}
+}
+
+func newGPS(debug bool, HDOP float64) (*gps, error) {
+	gps := &gps{
+		ch:     make(chan nmea.GGA),
+		debug:  debug,
+		closed: make(chan struct{}),
+	}
+
+	err := gps.setup()
+	if err != nil {
+		log.Fatalf("initial gps module setup err:%v", err)
+	}
+
 	go func() {
-		reader, err := setupGPS(debug)
-		if err != nil {
-			log.Fatalf("initial gps module setup err:%v", err)
-		}
+	loop:
 		for {
-			line, err := reader.ReadString('\n')
+			line, err := gps.ReadString('\n')
+			select {
+			case <-gps.closed:
+				break loop
+			default:
+			}
 			if err != nil {
-				log.Println("reading gps serial err:", err)
-				reader, err = setupGPS(debug)
-				if err != nil {
-					log.Fatalf("gps setup retry after a failed read err:%v", err)
-				}
+				log.Fatalf("reading gps serial err:", err)
 			}
 			line = strings.TrimSpace(line)
 			parsed, err := nmea.Parse(line)
@@ -157,41 +188,139 @@ func startGPS(debug bool, HDOP float64) (chan nmea.GGA, error) {
 			if parsed.DataType() == nmea.TypeGGA {
 				dataGPS := parsed.(nmea.GGA)
 				select {
-				case respChan <- dataGPS: // Don't block when the reciver is not ready.
+				case gps.ch <- dataGPS: // Don't block when the reciver is not ready.
 				default:
 				}
 			}
+			time.Sleep(30 * time.Second)
 		}
 	}()
 
-	return respChan, nil
+	return gps, nil
+
 }
 
-func setupGPS(debug bool) (*bufio.Reader, error) {
-	c := &serial.Config{Name: "/dev/ttyUSB0", Baud: 9600, ReadTimeout: 3000 * time.Second}
-	s, err := serial.OpenPort(c)
-	if err != nil {
-		return nil, errors.Wrap(err, "enable port")
-	}
+func (g *gps) channel() chan nmea.GGA {
+	return g.ch
+}
 
-	reader := bufio.NewReader(s)
+func (g *gps) reset() error {
+	if err := g.close(); err != nil {
+		log.Println("closing the gps port:", err)
+	}
+	err := ioutil.WriteFile("/sys/devices/platform/soc/20980000.usb/buspower", []byte("0"), 0644)
+	if err != nil {
+		return err
+	}
+	time.Sleep(1 * time.Second)
+	err = ioutil.WriteFile("/sys/devices/platform/soc/20980000.usb/buspower", []byte("1"), 0644)
+	if err != nil {
+		return err
+	}
+	time.Sleep(1 * time.Second)
+	return nil
+}
+
+func (g *gps) setup() error {
+	if err := g.setupPort(); err != nil {
+		return errors.Wrapf(err, "setup port")
+	}
+	// Drain the serial port from any previous commands.
+	g.ReadString('\n')
 
 	// Full ref: https://cdn-shop.adafruit.com/datasheets/PMTK_A08.pdf
 	// Turn on GGA:
 	command := "PMTK314,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
-	s.Write([]byte("$" + command + "*" + nmea.Checksum(command) + "\r\n"))
+	g.Write([]byte("$" + command + "*" + nmea.Checksum(command) + "\r\n"))
 
-	if !gerMTKAck(debug, 314, reader) {
-		return nil, errors.New("no cmd ack")
+	if !g.gerMTKAck(314) {
+		return errors.New("no cmd ack")
 	}
 
-	// Set update rate to once every 10 second (10hz).
-	command = "PMTK220,10000"
-	s.Write([]byte("$" + command + "*" + nmea.Checksum(command) + "\r\n"))
-	if !gerMTKAck(debug, 220, reader) {
-		return nil, errors.New("no cmd ack")
+	// Set update rate to once every 1 seconds.
+	command = "PMTK220,1000"
+	g.Write([]byte("$" + command + "*" + nmea.Checksum(command) + "\r\n"))
+	if !g.gerMTKAck(220) {
+		return errors.New("no cmd ack")
 	}
-	return reader, nil
+	return nil
+}
+
+func (g *gps) setupPort() error {
+	portPath, err := selectPort()
+	if err != nil {
+		return errors.Wrapf(err, "selecting gps port")
+	}
+	if g.debug {
+		log.Println("selected gps port:", portPath)
+	}
+
+	c := &serial.Config{Name: portPath, Baud: 9600, ReadTimeout: 3000 * time.Second}
+	port, err := serial.OpenPort(c)
+	if err != nil {
+		return errors.Wrap(err, "enable port")
+	}
+	g.Port = port
+	g.Reader = bufio.NewReader(port)
+	return nil
+}
+
+func selectPort() (string, error) {
+	portPath := ""
+	for index := 0; index < 10; index++ {
+		if _, err := os.Stat("/dev/ttyUSB0"); err == nil {
+			portPath = "/dev/ttyUSB0"
+		}
+		if _, err := os.Stat("/dev/ttyUSB1"); err == nil {
+			portPath = "/dev/ttyUSB1"
+		}
+		if portPath != "" {
+			break
+		}
+		err := ioutil.WriteFile("/sys/devices/platform/soc/20980000.usb/buspower", []byte("1"), 0644)
+		if err != nil {
+			return "", err
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	if portPath == "" {
+		return "", errors.New("no gps usb device exists")
+	}
+	return portPath, nil
+}
+
+// gerCmdAck reads untill it gets an ack for the initial setup command or
+// untill it reached a reader error.
+// This ic because the module might be currenlty active so
+// might receive another response before the ack recponse.
+func (g *gps) gerMTKAck(cmdID int64) bool {
+	var ok bool
+	for x := 0; x < 20; x++ {
+		line, err := g.ReadString('\n')
+		if err != nil {
+			break
+		}
+		if g.debug {
+			log.Println("gps cmd ack response line:", line)
+		}
+		resp, err := nmea.Parse(strings.TrimSpace(line))
+		if err != nil {
+			log.Fatal("parsing the response:", line, "err:", err)
+		}
+		if resp.TalkerID() == nmea.TypeMTK {
+			d := resp.(nmea.MTK)
+			if d.Cmd == cmdID && d.Flag == 3 {
+				ok = true
+				break
+			}
+		}
+	}
+	return ok
+}
+
+func (g *gps) close() error {
+	close(g.closed)
+	return g.Close()
 }
 
 func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) {
@@ -225,7 +354,9 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 		log.Printf("lora module band set resp:%v", resp)
 	}
 
-	config := "pwr_level:0" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
+	// If the received data is empty should increase the dr settings.
+	// https://docs.exploratory.engineering/lora/dr_sf/
+	config := "adr:off" + "&dr:1" + "&pwr_level:0" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
 	resp, err = lora.SetConfig(config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "set lora config with:%v", config)
@@ -237,8 +368,8 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 	// Try to register undefinitely.
 	// The lora gateway might be down so should keep trying and not exit.
 	attempt := 1
+	now := time.Now()
 	for {
-		now := time.Now()
 		if debug {
 			log.Print("sending join request attempt:", attempt)
 		}
@@ -249,7 +380,7 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 		}
 
 		if resp == rak811.STATUS_JOINED_SUCCESS {
-			log.Println("lora module joined, request duration:", time.Since(now))
+			log.Println("lora module joined, total join request duration:", time.Since(now))
 			break
 		}
 		if debug {
@@ -258,33 +389,4 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 		attempt++
 	}
 	return lora, nil
-}
-
-// gerCmdAck reads untill it gets an ack for the initial setup command or
-// untill it reached a reader error.
-// This ic because the module might be currenlty active so
-// might receive another response before the ack recponse.
-func gerMTKAck(debug bool, cmdID int64, reader *bufio.Reader) bool {
-	var ok bool
-	for x := 0; x < 20; x++ {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			break
-		}
-		if debug {
-			log.Println("gps cmd ack responce line:", line)
-		}
-		resp, err := nmea.Parse(strings.TrimSpace(line))
-		if err != nil {
-			log.Fatal("parsing the response:", line, "err:", err)
-		}
-		if resp.TalkerID() == nmea.TypeMTK {
-			d := resp.(nmea.MTK)
-			if d.Cmd == cmdID && d.Flag == 3 {
-				ok = true
-				break
-			}
-		}
-	}
-	return ok
 }
