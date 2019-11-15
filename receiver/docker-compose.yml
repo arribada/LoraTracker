@@ -85,13 +85,9 @@ services:
       POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
   lora-connect:
-    image: arribada/lora-connect@sha256:150debfe7bf63e854861316eddbfcdff34b85973ab02c89a79ad0365e40085ac
-    # ports:
-    # - "8070:8070"
+    image: arribada/lora-connect@sha256:f506403adc3be4e5f35a3cba66216b9f0deb3d2a2cb4908c86a8e26686342dfc
   packet-forwarder:
-    image: arribada/packet-forwarder@sha256:899d4fe181c785a376ea9c441e5220f4256966012a5f8ce9a194a7a983ce170e
-    depends_on:
-      - gatewaybridge
+    image: arribada/packet-forwarder@sha256:7ea7afe7ecc5080be0e882e3f310c373bd8a29503c6c647063fad40ba7d76d60
     privileged: true
     environment:
       CONCENTRATOR_RESET_PIN: 22
@@ -265,18 +261,18 @@ services:
           }
         }
   loraserver:
-    image: arribada/loraserver@sha256:99051299b1a734a1b56093336f0f2fd3b0db6672fe562a2ff5c9363453f9bfaa
+    image: arribada/loraserver@sha256:ad2d3886779723dc41a5dd699559f1819c7909efc13acd4ab29530f1dfc552ef
     depends_on:
       - postgresql
       - mosquitto
     environment:
-      - REDIS_URL=redis://redis:6379
-      - NETWORK__SERVER_BAND_NAME=EU_863_870
-      - NETWORK__SERVER_GATEWAY_BACKEND_MQTT_SERVER=tcp://mosquitto:1883
-      - JOIN__SERVER_DEFAULT_SERVER=http://appserver:8003
-      - GEOLOCATION__SERVER_SERVER=geoserver:8005
+      - REDIS__URL=redis://redis:6379
+      - NETWORK_SERVER__BAND__NAME=EU_863_870
+      - NETWORK_SERVER__GATEWAY__BACKEND__MQTT__SERVER=tcp://mosquitto:1883
+      - JOIN_SERVER__DEFAULT__SERVER=http://appserver:8003
+      - GEOLOCATION_SERVER__SERVER=geoserver:8005
   appserver:
-    image: arribada/lora-app-server@sha256:31878520b836fd78d340a94d90fab1318a790c21b5dbd657f4bbf66e5b5f3db6
+    image: arribada/lora-app-server@sha256:26360fc087846ab50d6ca04bb7303618747eeb85717b787c6d551f520a61db22
     depends_on:
       - postgresql
       - redis
