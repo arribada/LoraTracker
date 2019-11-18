@@ -31,7 +31,7 @@ func main() {
 	if h != "" {
 		h, err := strconv.ParseFloat(h, 64)
 		if err != nil {
-			log.Fatalf("uanble to parse HDOP err:%v", err)
+			log.Fatalf("unable to parse HDOP err:%v", err)
 		}
 		HDOP = h
 		log.Println("set to skip gps data with  accuracy below HDOP:", HDOP)
@@ -54,7 +54,7 @@ func main() {
 	if debug {
 		log.Println("enabling gps module")
 	}
-	gps, err := newGPS(debug, HDOP)
+	gps, err := newGPS(debug)
 	if err != nil {
 		log.Fatal("failed to enable gps err:", err)
 	}
@@ -86,7 +86,7 @@ func main() {
 				if err := gps.reset(); err != nil {
 					log.Fatal(err)
 				}
-				gps, err = newGPS(debug, HDOP)
+				gps, err = newGPS(debug)
 				if err != nil {
 					log.Fatal("failed to enable gps err:", err)
 				}
@@ -155,7 +155,7 @@ type gps struct {
 	closed chan struct{}
 }
 
-func newGPS(debug bool, HDOP float64) (*gps, error) {
+func newGPS(debug bool) (*gps, error) {
 	gps := &gps{
 		ch:     make(chan nmea.GGA),
 		debug:  debug,
