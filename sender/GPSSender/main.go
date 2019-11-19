@@ -118,6 +118,9 @@ func main() {
 		// The amount of data that can be send is limited by region and dr.
 		// If the received data is empty should increase the dr settings of the lora module.
 		dataLora := []byte(fmt.Sprintf("%.6f", dataGPS.Latitude) + "," + fmt.Sprintf("%.6f", dataGPS.Longitude))
+		if os.Getenv("SINGLE_POINTS") != "" {
+			dataLora += ",s"
+		}
 		if debug {
 			log.Printf("%v:trying to send gps GGA:%v lora:%v encoded:%v\n", attempt, dataGPS, string(dataLora), hex.EncodeToString(dataLora))
 		}

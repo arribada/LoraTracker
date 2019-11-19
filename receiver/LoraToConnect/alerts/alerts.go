@@ -194,7 +194,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
 	var err error
-	lat, long, err := parseCoordinates(string(data.Data))
+	lat, long, single, err := parse(string(data.Data))
 	if err != nil {
 		return err
 	}
@@ -237,7 +237,14 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 		s.mtx.Unlock()
 	}
 
-	url := s.server + "/server/api/connectalert/" + genDevID(data)
+	url := s.server + "/server/api/connectalert/"
+	// Use the same alert identifier when want to have a continious line
+	// or use the current time as unique identifier when want to display each alert as an individual point.
+	if !single {
+		url += genDevID(data)
+	} else {
+		url += strconv.Itoa(time.Now().UnixNano())
+	}
 
 	var jsonStr = []byte(`
 	{
@@ -524,30 +531,33 @@ func (s *Handler) httpError(w http.ResponseWriter, error string, code int) {
 func genDevID(data *DataUpPayload) string {
 	return data.DeviceName + "-" + data.DevEUI.String()
 }
-func parseCoordinates(raw string) (float64, float64, error) {
+func parse(raw string) (float64, float64, bool, error) {
 	coordinates := strings.Split(string(raw), ",")
 	if len(coordinates) < 2 {
-		return 0, 0, fmt.Errorf("parsing the cordinates string:%v", raw)
+		return 0, 0, false, fmt.Errorf("parsing the cordinates string:%v", raw)
 
 	}
 
 	latitude, err := strconv.ParseFloat(coordinates[0], 64)
 	if err != nil {
-		return 0, 0, errors.Errorf("parsing the latitude string err:%v", err)
+		return 0, 0, false, errors.Errorf("parsing the latitude string err:%v", err)
 
 	}
 	if latitude < -90 || latitude > 90 {
-		return 0, 0, errors.New("latitude outside acceptable values")
+		return 0, 0, false, errors.New("latitude outside acceptable values")
 	}
 	longitude, err := strconv.ParseFloat(coordinates[1], 64)
 	if err != nil {
-		return 0, 0, errors.Errorf("parsing the longitude string err:%v", err)
+		return 0, 0, false, errors.Errorf("parsing the longitude string err:%v", err)
 
 	}
 	if longitude < -180 || longitude > 180 {
-		return 0, 0, errors.New("longitude outside acceptable values")
+		return 0, 0, false, errors.New("longitude outside acceptable values")
 	}
-	return latitude, longitude, nil
+
+	singlePoints := len(coordinates) == 3 && coordinates[2] == "s"
+
+	return latitude, longitude, singlePoints, nil
 }
 
 // DataUpPayload represents a data-up payload.

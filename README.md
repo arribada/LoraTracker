@@ -3,7 +3,8 @@
 
 
 TODO:
- - make a video how to add new devices.
+ - send updates only when the change is more than 10m
+ - make  the demo.
  - remove the workaround for the dots in the env variables and remove from loraserver images and EnvToFile.
     - PR the lora  - https://github.com/brocaar/lora-app-server/issues/369
  - update the same partol with new gps coordinates
