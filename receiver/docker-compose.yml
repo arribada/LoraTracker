@@ -85,7 +85,7 @@ services:
       POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
   lora-connect:
-    image: arribada/lora-connect@sha256:f506403adc3be4e5f35a3cba66216b9f0deb3d2a2cb4908c86a8e26686342dfc
+    image: arribada/lora-connect@sha256:e48122f5cecb34036917aa7e06089498664fa3689f1e13d2c3b015f67356e975
   packet-forwarder:
     image: arribada/packet-forwarder@sha256:7ea7afe7ecc5080be0e882e3f310c373bd8a29503c6c647063fad40ba7d76d60
     privileged: true
@@ -320,7 +320,8 @@ services:
     ports:
       - 9090:9090
     command:
-      - --config.file=/configs/PROMETHEUS_CONFIG
+    - --config.file=/configs/PROMETHEUS_CONFIG
+    - --storage.tsdb.retention.size=10GB
   alertmanager:
     image: prom/alertmanager@sha256:090ffef59d4089b7ff9fba475f3c0bb8e2ceb7351483a054c02fb29c8e004709
     depends_on:
