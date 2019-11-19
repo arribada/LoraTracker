@@ -239,11 +239,11 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 
 	url := s.server + "/server/api/connectalert/"
 	// Use the same alert identifier when want to have a continious line
-	// or use the current time as unique identifier when want to display each alert as an individual point.
+	// or use the current time as unique identifier when want to display each alert as an  individual point.
 	if !single {
 		url += genDevID(data)
 	} else {
-		url += strconv.Itoa(time.Now().UnixNano())
+		url += strconv.Itoa(int(time.Now().UnixNano()))
 	}
 
 	var jsonStr = []byte(`
