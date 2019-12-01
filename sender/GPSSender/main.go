@@ -36,20 +36,6 @@ func main() {
 		HDOP = h
 		log.Println("set to skip gps data with  accuracy below HDOP:", HDOP)
 	}
-	appKey := os.Getenv("APP_KEY")
-	if appKey == "" {
-		log.Fatal("missing APP_KEY env variable")
-	}
-	if len(appKey) != 32 {
-		log.Fatalf("APP_KEY should be 32 char long, current length:%v", len(appKey))
-	}
-	devEUI := os.Getenv("DEV_EUI")
-	if appKey == "" {
-		log.Fatal("missing DEV_EUI env variable")
-	}
-	if len(devEUI) != 16 {
-		log.Fatalf("DEV_EUI should be 16 char long, current length:%v", len(devEUI))
-	}
 
 	if debug {
 		log.Println("enabling gps module")
@@ -62,7 +48,7 @@ func main() {
 	if debug {
 		log.Println("enabling lora module")
 	}
-	lora, err := newLoraConnection(devEUI, appKey, debug)
+	lora, err := newLoraConnection(debug)
 	if err != nil {
 		log.Fatal("failed to create lora connection err:", err)
 	}
@@ -117,20 +103,20 @@ func main() {
 
 		// The amount of data that can be send is limited by region and dr.
 		// If the received data is empty should increase the dr settings of the lora module.
-		dataLora := []byte(fmt.Sprintf("%.6f", dataGPS.Latitude) + "," + fmt.Sprintf("%.6f", dataGPS.Longitude))
+		dataLora := fmt.Sprintf("%.6f", dataGPS.Latitude) + "," + fmt.Sprintf("%.6f", dataGPS.Longitude)
 		if os.Getenv("SINGLE_POINTS") != "" {
-			dataLora += ",s"
+			dataLora +=",s"
 		}
 		if debug {
-			log.Printf("%v:trying to send gps GGA:%v lora:%v encoded:%v\n", attempt, dataGPS, string(dataLora), hex.EncodeToString(dataLora))
+			log.Printf("%v:trying to send gps GGA:%v lora:%v encoded:%v\n", attempt, dataGPS, dataLora, hex.EncodeToString([]byte(dataLora)))
 		}
-		resp, err := lora.Send("0,1," + hex.EncodeToString(dataLora))
+		resp, err := lora.Send("0,1," + hex.EncodeToString([]byte(dataLora)))
 		if err != nil {
 			log.Println("failed to send data err:", err)
 			// Attempt to register again.
 			log.Println(attempt, ":registration retry")
 			attempt++
-			lora, _ = newLoraConnection(devEUI, appKey, debug)
+			lora, _ = newLoraConnection(debug)
 			continue
 		}
 
@@ -195,7 +181,7 @@ func newGPS(debug bool) (*gps, error) {
 				default:
 				}
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}()
 
@@ -326,7 +312,35 @@ func (g *gps) close() error {
 	return g.Close()
 }
 
-func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) {
+func newLoraConnection(debug bool) (*rak811.Lora, error) {
+	appKey := os.Getenv("APP_KEY")
+	if appKey == "" {
+		log.Fatal("missing APP_KEY env variable")
+	}
+	if len(appKey) != 32 {
+		log.Fatalf("APP_KEY should be 32 char long, current length:%v", len(appKey))
+	}
+	devEUI := os.Getenv("DEV_EUI")
+	if appKey == "" {
+		log.Fatal("missing DEV_EUI env variable")
+	}
+	if len(devEUI) != 16 {
+		log.Fatalf("DEV_EUI should be 16 char long, current length:%v", len(devEUI))
+	}
+
+	dataRate := os.Getenv("DATA_RATE")
+	if dataRate == "" {
+		dataRate = "1"
+	}
+	s, err := strconv.ParseInt(dataRate, 10, 64)
+	if err != nil {
+		log.Fatal("failed to parse data rate", err)
+
+	}
+	if s < 0 || s > 13 {
+		log.Fatal("expected data rate should be between 0 and 13, actual:", s)
+	}
+
 	cfg := &serial.Config{
 		Name: "/dev/ttyAMA0", // Inside docker /dev/serial0 is not available even in priviliged.
 	}
@@ -359,7 +373,8 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 
 	// If the received data is empty should increase the dr settings.
 	// https://docs.exploratory.engineering/lora/dr_sf/
-	config := "adr:off" + "&dr:1" + "&pwr_level:0" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
+	// https://www.compel.ru/item-pdf/7008b5e14cfb8d82cebabdb784d57018/pn/rak~rak811.pdf
+	config := "adr:off" + "&dr:" + dataRate + "&pwr_level:0" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
 	resp, err = lora.SetConfig(config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "set lora config with:%v", config)
@@ -380,7 +395,7 @@ func newLoraConnection(devEUI, appKey string, debug bool) (*rak811.Lora, error) 
 		if err != nil || attempt > 25 {
 			log.Println("Reseting the module due to a join request err:", err, "or too many attempts:", attempt)
 			lora.Close()
-			return newLoraConnection(devEUI, appKey, debug)
+			return newLoraConnection(debug)
 		}
 
 		if resp == rak811.STATUS_JOINED_SUCCESS {
