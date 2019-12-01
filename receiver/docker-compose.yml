@@ -2,7 +2,7 @@ version: "2.1"
 
 services:
   env-config:
-    image: arribada/env-config@sha256:de67b3986d49c9d90916b8960cebc57a4ff522006b553fedc8dcc9289b6dad09
+    image: arribada/env-config@sha256:69b671da6d29ff43e51e36a3e9a540e0776ea5a47ca7a4af8029a3dccf60e02e
     volumes:
     - configs:/configs/
     command:
@@ -246,7 +246,7 @@ services:
 
           "gateway_conf": {
               "gateway_ID": "0242acfffe110006",
-              "server_address": "gatewaybridge",
+              "server_address": "chirpstack-gatewaybridge",
               "serv_port_up": 1700,
               "serv_port_down": 1700,
               "keepalive_interval": 10,
@@ -263,60 +263,49 @@ services:
               "beacon_infodesc": 0
           }
         }
-  networkserver:
+  chirpstack-networkserver:
     image: arribada/chirpstack-networkserver@sha256:10df9b71dc5db60048edacff50dc29f8a51729224c542b1d384e79123f43bb03
-    depends_on:
-      - postgresql
-      - mosquitto
     environment:
-      - REDIS__URL=redis://redis:6379
+      - REDIS__URL=redis://chirpstack-redis:6379
       - NETWORK_SERVER__BAND__NAME=EU_863_870
-      - NETWORK_SERVER__GATEWAY__BACKEND__MQTT__SERVER=tcp://mosquitto:1883
-      - JOIN_SERVER__DEFAULT__SERVER=http://appserver:8003
-      - GEOLOCATION_SERVER__SERVER=geoserver:8005
-  appserver:
+      - NETWORK_SERVER__GATEWAY__BACKEND__MQTT__SERVER=tcp://chirpstack-mosquitto:1883
+      - JOIN_SERVER__DEFAULT__SERVER=http://chirpstack-appserver:8003
+      - GEOLOCATION_SERVER__SERVER=chirpstack-geoserver:8005
+  chirpstack-appserver:
     image: arribada/chirpstack-app-server@sha256:d6b02df980166ff4332c4f9a3b9904a524dc37494458db6a93a7b9ca16e303b7
-    depends_on:
-      - postgresql
-      - redis
     ports:
       - 8080:8080
     environment:
-      - REDIS__URL=redis://redis:6379
-      - APPLICATION_SERVER__INTEGRATION__MQTT__SERVER=tcp://mosquitto:1883
-      - APPLICATION_SERVER__API__PUBLIC_HOST=appserver:8001
+      - REDIS__URL=redis://chirpstack-redis:6379
+      - APPLICATION_SERVER__INTEGRATION__MQTT__SERVER=tcp://chirpstack-mosquitto:1883
+      - APPLICATION_SERVER__API__PUBLIC_HOST=chirpstack-appserver:8001
       
-  gatewaybridge:
+  chirpstack-gatewaybridge:
     image: arribada/chirpstack-gateway-bridge@sha256:bb45ed039fb3ba6d4a5a8674edb63bdf80f4aa66a8e952b7cd50db368122ff51
-    depends_on:
-      - mosquitto
     ports:
       - 1700:1700/udp
     environment:
-      - INTEGRATION__MQTT__AUTH__GENERIC__SERVERS=tcp://mosquitto:1883
-  geoserver:
+      - INTEGRATION__MQTT__AUTH__GENERIC__SERVERS=tcp://chirpstack-mosquitto:1883
+  chirpstack-geoserver:
     image: arribada/chirpstack-geo-server@sha256:4459e83e306e0fb5e02b862c14383067c7043730ef67e785ffdf5f120dba42d6
     environment:
       - GEO_SERVER__BACKEND__NAME=collos
-  postgresql:
+  chirpstack-postgresql:
     depends_on:
       - env-config
-      - mosquitto
     image: postgres:9.6-alpine@sha256:5f30f64d292adba6834c2acf431660c41514a4bdf3b979e6dd2f9930dcf53175
     volumes:
       - configs:/docker-entrypoint-initdb.d/
-      - lora-postgres:/var/lib/postgresql/data
-  redis:
+      - chirpstack-postgres:/var/lib/postgresql/data
+  chirpstack-redis:
     image: redis:5-alpine@sha256:f56ac9669267aec516ebfb8d7f61fc6344b7c93d9b24f45e0f952c6f74f36015
     volumes:
-      - lora-redis:/data
-  mosquitto:
+      - chirpstack-redis:/data
+  chirpstack-mosquitto:
     image: eclipse-mosquitto@sha256:98b755512a8487877e2e98cbf3ba7a4987bc71d8e1c632d5aa86f43ee7db0e34
 
   prometheus:
     image: prom/prometheus@sha256:ac56e023deb66f2bf25fe103db8c96b927c68239008ac221670b27e9ea4e3956
-    depends_on:
-      - env-config
     volumes:
     - configs:/configs/
     - prometheus:/prometheus
@@ -327,8 +316,6 @@ services:
     - --storage.tsdb.retention.size=10GB
   alertmanager:
     image: prom/alertmanager@sha256:090ffef59d4089b7ff9fba475f3c0bb8e2ceb7351483a054c02fb29c8e004709
-    depends_on:
-      - env-config
     volumes:
     - configs:/configs/
     - alertmanager:/alertmanager
@@ -340,8 +327,8 @@ services:
 volumes:
   smart-postgres:
   smart-connect:
-  lora-postgres:
-  lora-redis:
+  chirpstack-postgres:
+  chirpstack-redis:
   prometheus:
   alertmanager:
   configs:

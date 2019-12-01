@@ -56,30 +56,30 @@ NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The
 cd ./receiver
 balena push SMARTLoraReciever
 ```
-- Service Variables for the `appserver` service.
+- Service Variables for the `chirpstack-appserver` service.
 > replace the `...` with the value from the POSTGRES_PASSWORD env variable.
 
 ```
-POSTGRESQL_DSN=postgres;//loraserver_as;...@postgresql/loraserver_as?sslmode=disable
+POSTGRESQL_DSN=postgres://chirpstack_as:...@chirpstack-postgresql/chirpstack_as?sslmode=disable
 ```
-- Service Variables for the `loraserver` service.
+- Service Variables for the `chirpstack-networkserver` service.
 ```
-POSTGRESQL_DSN=postgres;//loraserver_ns;...@postgresql/loraserver_ns?sslmode=disable
+POSTGRESQL_DSN=postgres://chirpstack_ns:...@chirpstack-postgresql/chirpstack_ns?sslmode=disable
 ```
 
 ### Access the applications:
-Loraserver: http://deviceIPorDomain:8080<br/>
+Chirpstack App Server: http://deviceIPorDomain:8080<br/>
 Login: admin admin
 
 SMART connect: https://deviceIPorDomain:8443/server<br/>
 Login: smart smart
 
-### Setup loraserver
+### Setup chirpstack app server
 
 - Network-servers/Add
 ```
 name: gpsTracker
-server: loraserver:8000
+server: chirpstack-networkserver:8000
 ```
 - Service-profiles/Create
 ```
@@ -135,8 +135,8 @@ Uplink data URL: http://lora-connect:8070
 ## LoraGpsSender setup
  - Env vars
 ```
-APP_KEY= // the one set in loraserver
-DEV_EUI= // the one set in loraserver
+APP_KEY= // the one set in Chirpstack app server
+DEV_EUI= // the one set in Chirpstack app server
 BAND= // by default is is set to EU868 , other possible values are: AS923, EU868, AU915, US915, IN865, KR920
 ```
  - Fleet configuration
@@ -159,5 +159,3 @@ From the balena UI just select `Add a new device` and follow the on screen instr
 
 - Select the latest OS
 - Production image
-
-Now do the initial [Lora Server Setup](#setup-loraserver)
