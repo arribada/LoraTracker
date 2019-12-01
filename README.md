@@ -5,19 +5,20 @@
 TODO:
  - send updates only when the change is more than 10m
  - make  the demo.
- - remove the workaround for the dots in the env variables and remove from loraserver images and EnvToFile.
-    - PR the lora  - https://github.com/brocaar/lora-app-server/issues/369
- - update the same partol with new gps coordinates
- - at the end unexpose all ports for services that are not needed.
+ - the postgres init script needs a dot in the file name created from the env.
 
 
-# Setup Pager duty account for the alerting(optional)
+# Setup Pager duty account for the alerting(optional).
  - Sign up for an account.
  - Add a phone number under the profile Notification Rules.
  - Create a service.
  - Choose the integration as API V2.
- - copy the `Integration Key` add it as an env vairable called `ROUTING_KEY` with the balena setup(see below).
+ - copy the `Integration Key` and add it as an env vairable called `PAGERDUTY_ROUTING_KEY` with the balena setup(see below).
 
+# Setup Slack for alerting(optional).
+- Create a slack channel for receiving the alerts.
+- Install the [Slack Webhooks App](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks)
+- Copy the Webhook URL and add it as an env vairable called `SLACK_API_URL` with the balena setup(see below).
 
 # Initial Setup on Balena cloud
 
@@ -39,7 +40,8 @@ RESIN_HOST_CONFIG_gpu_mem 16mb
 APPLICATION__SERVER_EXTERNAL__API_JWT__SECRET=....
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=...
-ROUTING_KEY=... # The "Integration Key" from Pager Duty for sending  alerts with the alert manager.
+PAGERDUTY_ROUTING_KEY=... # The "Integration Key" from Pager Duty for sending  alerts with the alert manager.
+SLACK_API_URL=... # The "Webhook URL" from the Slack Webhooks App.
 CONCENTRATOR_CONFIG= // The semtech gateway setting. See https://github.com/arribada/packet-forwarder
 NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The default is EU_863_870. For all possible options see https://www.chirpstack.io/network-server
 ```

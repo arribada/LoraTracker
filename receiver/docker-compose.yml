@@ -2,13 +2,13 @@ version: "2.1"
 
 services:
   env-config:
-    image: arribada/env-config@sha256:63cc992847d8e378190d88dc21390f09337fd1102ccdb65d9aefd26846444b61
+    image: arribada/env-config@sha256:de67b3986d49c9d90916b8960cebc57a4ff522006b553fedc8dcc9289b6dad09
     volumes:
     - configs:/configs/
     command:
         - --dir=/configs/
     environment:
-      PROMETHEUS__CONFIG: |-
+      PROMETHEUS_CONFIG: |-
         global:
           scrape_interval:     5s
         scrape_configs:
@@ -22,7 +22,7 @@ services:
                 - alertmanager:9093
         rule_files:
             - /configs/PROMETHEUS_ALERTING
-      PROMETHEUS__ALERTING: |-
+      PROMETHEUS_ALERTING: |-
         groups:
         - name: /etc/prometheus/alert.rules
           rules:
@@ -38,37 +38,40 @@ services:
               severity: "critical"
             annotations:
               summary: \"GPS tracker parameter threshold\"
-      ALERTMANAGER__CONFIG: |-
+      ALERTMANAGER_CONFIG: |-
         route:
-          receiver: 'krasi'
+          receiver: 'default'
           routes:
           - match:
                 alertname: GPSPerimeterBreach
           - match:
                 alertname: GPSNoUpdate
         receivers:
-        - name: 'krasi'
+        - name: 'default'
           pagerduty_configs:
-          - routing_key: $ROUTING_KEY
-      INIT__LORASERVER_sh: |-
+          - routing_key: $PAGERDUTY_ROUTING_KEY
+          slack_configs:
+            - api_url: $SLACK_API_URL
+              send_resolved: true
+      INIT_CHIRPSTACK_sh: |-
         #!/bin/bash
         set -e
 
         psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
-          create role loraserver_ns with login password '$POSTGRES_PASSWORD';
-          create database loraserver_ns with owner loraserver_ns;
+          create role chirpstack_ns with login password '$POSTGRES_PASSWORD';
+          create database chirpstack_ns with owner chirpstack_ns;
         EOSQL
 
         psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
-          create role loraserver_as with login password '$POSTGRES_PASSWORD';
-          create database loraserver_as with owner loraserver_as;
+          create role chirpstack_as with login password '$POSTGRES_PASSWORD';
+          create database chirpstack_as with owner chirpstack_as;
         EOSQL
 
-        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname="loraserver_as" <<-EOSQL
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname="chirpstack_as" <<-EOSQL
           create extension pg_trgm;
         EOSQL
 
-        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname="loraserver_as" <<-EOSQL
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname="chirpstack_as" <<-EOSQL
           create extension hstore;
         EOSQL
   smart-postgres:
@@ -85,7 +88,7 @@ services:
       POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
   lora-connect:
-    image: arribada/lora-connect@sha256:e48122f5cecb34036917aa7e06089498664fa3689f1e13d2c3b015f67356e975
+    image: arribada/lora-connect@sha256:5888d17ba9b391c034f1470470e8e4b8e092cc6c0e146c7670e9cc5305e00111
   packet-forwarder:
     image: arribada/packet-forwarder@sha256:7ea7afe7ecc5080be0e882e3f310c373bd8a29503c6c647063fad40ba7d76d60
     privileged: true
@@ -260,8 +263,8 @@ services:
               "beacon_infodesc": 0
           }
         }
-  loraserver:
-    image: arribada/loraserver@sha256:ad2d3886779723dc41a5dd699559f1819c7909efc13acd4ab29530f1dfc552ef
+  networkserver:
+    image: arribada/chirpstack-networkserver@sha256:10df9b71dc5db60048edacff50dc29f8a51729224c542b1d384e79123f43bb03
     depends_on:
       - postgresql
       - mosquitto
@@ -272,29 +275,29 @@ services:
       - JOIN_SERVER__DEFAULT__SERVER=http://appserver:8003
       - GEOLOCATION_SERVER__SERVER=geoserver:8005
   appserver:
-    image: arribada/lora-app-server@sha256:26360fc087846ab50d6ca04bb7303618747eeb85717b787c6d551f520a61db22
+    image: arribada/chirpstack-app-server@sha256:d6b02df980166ff4332c4f9a3b9904a524dc37494458db6a93a7b9ca16e303b7
     depends_on:
       - postgresql
       - redis
     ports:
       - 8080:8080
     environment:
-      - REDIS_URL=redis://redis:6379
-      - APPLICATION__SERVER_INTEGRATION_MQTT_SERVER=tcp://mosquitto:1883
-      - APPLICATION__SERVER_API_PUBLIC__HOST=appserver:8001
+      - REDIS__URL=redis://redis:6379
+      - APPLICATION_SERVER__INTEGRATION__MQTT__SERVER=tcp://mosquitto:1883
+      - APPLICATION_SERVER__API__PUBLIC_HOST=appserver:8001
       
   gatewaybridge:
-    image: arribada/lora-gateway-bridge@sha256:eeb2a0d12e2ba706d8dd071938fd3e0d8a7b06254d0748a7504c781b5425af9c
+    image: arribada/chirpstack-gateway-bridge@sha256:bb45ed039fb3ba6d4a5a8674edb63bdf80f4aa66a8e952b7cd50db368122ff51
     depends_on:
       - mosquitto
     ports:
       - 1700:1700/udp
     environment:
-      - INTEGRATION_MQTT_AUTH_GENERIC_SERVER=tcp://mosquitto:1883
+      - INTEGRATION__MQTT__AUTH__GENERIC__SERVERS=tcp://mosquitto:1883
   geoserver:
-    image: arribada/lora-geo-server@sha256:69534b499347edfba84b2dd778993d3c0de83e435454737501d76cc300cf8249
+    image: arribada/chirpstack-geo-server@sha256:4459e83e306e0fb5e02b862c14383067c7043730ef67e785ffdf5f120dba42d6
     environment:
-      - GEO__SERVER_BACKEND_NAME=collos
+      - GEO_SERVER__BACKEND__NAME=collos
   postgresql:
     depends_on:
       - env-config
