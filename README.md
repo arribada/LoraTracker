@@ -3,9 +3,11 @@
 
 
 TODO:
- - send updates only when the change is more than 10m
+ - how to deal with backloging when the sender is out of range?
+    backloging in connect might be  possible by providing a date with the alert api call.
+    backlogging in Prometheus is possible, but tricky
+    sending a single update with the lowset data rate setting takes 1-2 minutes so the speed for sending backlogs is not enough. need add an option to increase the speed based on the signal strength.
  - make  the demo.
- - the postgres init script needs a dot in the file name created from the env.
 
 
 # Setup Pager duty account for the alerting(optional).
@@ -130,6 +132,7 @@ headers:
     SMARTcarea: get it from SMART connect
     SMARTuser: smart
     SMARTpass: smart
+    SMARTDesktopFile: # Optional header if you want to create an upload to Smart Desktop. See the section for Smart Desktop setup.
 Uplink data URL: http://lora-connect:8070
 ```
 ## LoraGpsSender setup
@@ -152,6 +155,14 @@ RESIN_HOST_CONFIG_dtoverlay pi3-miniuart-bt
 cd ./sender
 balena push ApplicationName
 ```
+
+## Smart Desktop setup
+
+If you want to create upload the data to SMART desktop need to setup SMART desktop to be connected to SMART connect and also set the content of the data to be uploaded as a header in the chirpstack HTTP integration setup.
+ - Install the Smart connect plugins.
+ - Setup the connection to SMART connect. It requires HTTPS and for this can use the default certificate in https://github.com/arribada/SMARTConnect
+ - Create an example Patrol and export it. This will be used as a template.
+ - Take the content of the Patrol file and set it as chirpstack HTTP integration header.
 
 ## Adding an additional device
 

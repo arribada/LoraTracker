@@ -185,10 +185,19 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("alert created for application:", data.ApplicationName, ",device id:", genDevID(data))
 
-	if err := s.createPatrolUpload(w, r, data); err != nil {
-		s.httpError(w,"creating an upload err:"+ err.Error(), http.StatusBadRequest)
+
+	fileContent, ok := r.Header["Smartdesktopfile"]
+	if !ok || len(fileContent) != 1 {
+		if os.Getenv("DEBUG") != "" {
+			log.Printf("Smartdesktopfile header is empty so NOT creating an upload for SMART desktop")
+		}
+	}else{
+		if err := s.createPatrolUpload(w, r, []byte(fileContent[0])); err != nil {
+			s.httpError(w,"creating an upload err:"+ err.Error(), http.StatusBadRequest)
+		}
+		log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
 	}
-	log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
+	
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -311,30 +320,12 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	return nil
 }
 
-func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
-	geo, err := wkt.Marshal(geom.NewPoint(geom.XY).MustSetCoords(geom.Coord{1, 2}))
-	if err != nil {
-		return fmt.Errorf("marshal geo location err:%v", err)
-	}
+func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request,fileContent []byte) error {
+	 _,_ = wkt.Marshal(geom.NewPoint(geom.XY).MustSetCoords(geom.Coord{1, 2}))
+	// if err != nil {
+	// 	return fmt.Errorf("marshal geo location err:%v", err)
+	// }
 	fileName := "patrol.xml"
-	fileContent := []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<ns2:patrol xmlns:ns2="http://www.smartconservationsoftware.org/xml/1.2/patrol" patrolType="GROUND" startDate="2019-06-13" endDate="2019-06-13" isArmed="false" id="SMART_000001">
-    <ns2:objective>
-        <ns2:description></ns2:description>
-    </ns2:objective>
-    <ns2:team languageCode="en" value="Community Team 1"/>
-    <ns2:station languageCode="en" value="Fixed Patrol Post 1"/>
-    <ns2:legs startDate="2019-06-13" endDate="2019-06-13" id="1">
-        <ns2:transportType languageCode="en" value="Research and Monitoring"/>
-        <ns2:members givenName="David" familyName="Aliata" employeeId="195000012" isPilot="false" isLeader="true"/>
-		<ns2:days date="2019-06-13" startTime="00:00:00" endTime="23:59:59" restMinutes="0.0">
-			<ns2:track distance="0.05490675941109657" geom="` + geo + `"/>
-		</ns2:days>
-        <ns2:mandate languageCode="en" value="Research and Monitoring"/>
-    </ns2:legs>
-	<ns2:comment></ns2:comment>
-</ns2:patrol>`)
-
 	requestJSON := []byte(`
 	{
 		"conservationArea":"` + s.ca + `",
