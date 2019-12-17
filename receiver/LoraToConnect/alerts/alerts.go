@@ -185,16 +185,16 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("alert created for application:", data.ApplicationName, ",device id:", genDevID(data))
 
-	// if err := s.createPatrolUpload(w, r, data); err != nil {
-	// 	s.httpError(w,"creating an upload err:"+ err.Error(), http.StatusBadRequest)
-	// }
-	// log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
+	if err := s.createPatrolUpload(w, r, data); err != nil {
+		s.httpError(w,"creating an upload err:"+ err.Error(), http.StatusBadRequest)
+	}
+	log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
 	var err error
-	lat, long, single, err := parse(string(data.Data))
+	lat, long, single, err := Parse(string(data.Data))
 	if err != nil {
 		return err
 	}
@@ -531,7 +531,7 @@ func (s *Handler) httpError(w http.ResponseWriter, error string, code int) {
 func genDevID(data *DataUpPayload) string {
 	return data.DeviceName + "-" + data.DevEUI.String()
 }
-func parse(raw string) (float64, float64, bool, error) {
+func Parse(raw string) (float64, float64, bool, error) {
 	coordinates := strings.Split(string(raw), ",")
 	if len(coordinates) < 2 {
 		return 0, 0, false, fmt.Errorf("parsing the cordinates string:%v", raw)

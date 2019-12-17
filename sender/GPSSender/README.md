@@ -4,7 +4,7 @@ Can be pushed to Rpi running `balena push appName` from within the directory.
 
 Env Vars
 
-SEND_FAKE_GPS - when the gps cannot locate signal send some fake gps to test the lora connection.
+SEND_FAKE_GPS - when the gps cannot locate signal send some fake gps to test the lora connection. If the content of the env variable contains coordinates in the format 42.6948...,23.360 they are used instead.
 DEBUG=1 - enable debug logging.
 HDOP - set a minimum HDOP accuracy level. Usually anything below 1.50 is good
 APP_KEY - required lora server app key

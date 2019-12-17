@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/adrianmo/go-nmea"
+	"github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts"
 	"github.com/arribada/SMARTLoraTracker/sender/GPSSender/pkg/rak811"
 	"github.com/tarm/serial"
 )
@@ -55,6 +56,12 @@ func main() {
 
 	attempt := 1
 	fake := "GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
+	if os.Getenv("SEND_FAKE_GPS") != "" {
+		if lat, long,_, err := alerts.Parse(os.Getenv("SEND_FAKE_GPS")); err == nil {
+			log.Println("using coordinates from the fake enf var:", lat, long)
+			fake = "GPGGA,215147.000," + fmt.Sprintf("%f", lat*100) + ",N," + fmt.Sprintf("%f", long*100) + ",E,1,10,1.00,28.8,M,37.8,M,,"
+		}
+	}
 	parsed, err := nmea.Parse("$" + fake + "*" + nmea.Checksum(fake))
 	if err != nil {
 		log.Fatal(err)
@@ -105,7 +112,7 @@ func main() {
 		// If the received data is empty should increase the dr settings of the lora module.
 		dataLora := fmt.Sprintf("%.6f", dataGPS.Latitude) + "," + fmt.Sprintf("%.6f", dataGPS.Longitude)
 		if os.Getenv("SINGLE_POINTS") != "" {
-			dataLora +=",s"
+			dataLora += ",s"
 		}
 		if debug {
 			log.Printf("%v:trying to send gps GGA:%v lora:%v encoded:%v\n", attempt, dataGPS, dataLora, hex.EncodeToString([]byte(dataLora)))
