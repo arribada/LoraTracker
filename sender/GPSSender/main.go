@@ -57,14 +57,13 @@ func main() {
 	attempt := 1
 	fake := "GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
 	if os.Getenv("SEND_FAKE_GPS") != "" {
-		lat, long, _, err := alerts.Parse(os.Getenv("SEND_FAKE_GPS")); 
+		lat, long, _, err := alerts.Parse(os.Getenv("SEND_FAKE_GPS"))
 		if err == nil {
 			if os.Getenv("DEBUG") != "" {
 				log.Println("using coordinates from the fake enf var:", lat, long)
 			}
 			fake = "GPGGA,215147.000," + fmt.Sprintf("%f", lat*100) + ",N," + fmt.Sprintf("%f", long*100) + ",E,1,10,1.00,28.8,M,37.8,M,,"
-		}
-		if os.Getenv("DEBUG") != "" {
+		} else if os.Getenv("DEBUG") != "" {
 			log.Println("SEND_FAKE_GPS env didn't include valid coordinates to will the default ones in Bulgaria. err:", err)
 		}
 	}

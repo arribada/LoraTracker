@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/adrianmo/go-nmea v1.1.1-0.20190909160214-4effbc117043
+	github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-20191217110752-9c2e87c3d7b9
 	github.com/arribada/SMARTLoraTracker/sender/GPSSender/pkg/rak811 v0.0.0-00010101000000-000000000000
 	github.com/brocaar/lorawan v0.0.0-20191115102621-6095d473cf60 // indirect
 	github.com/davecheney/gpio v0.0.0-20160912024957-a6de66e7e470 // indirect
@@ -14,6 +15,7 @@ require (
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
 	github.com/twpayne/go-geom v1.0.5 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
+
 )
 
 replace github.com/arribada/SMARTLoraTracker/sender/GPSSender/pkg/rak811 => ./pkg/rak811
