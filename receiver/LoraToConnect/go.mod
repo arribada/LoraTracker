@@ -1,4 +1,4 @@
-module github.com/arribada/loraTracker/tools/SMARTGateway
+module github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect
 
 go 1.12
 
