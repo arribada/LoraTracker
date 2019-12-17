@@ -538,7 +538,7 @@ func Parse(raw string) (float64, float64, bool, error) {
 
 	}
 
-	latitude, err := strconv.ParseFloat(coordinates[0], 64)
+	latitude, err := strconv.ParseFloat(strings.Trim(coordinates[0]), 64)
 	if err != nil {
 		return 0, 0, false, errors.Errorf("parsing the latitude string err:%v", err)
 
@@ -546,7 +546,7 @@ func Parse(raw string) (float64, float64, bool, error) {
 	if latitude < -90 || latitude > 90 {
 		return 0, 0, false, errors.New("latitude outside acceptable values")
 	}
-	longitude, err := strconv.ParseFloat(coordinates[1], 64)
+	longitude, err := strconv.ParseFloat(strings.Trim(coordinates[1]), 64)
 	if err != nil {
 		return 0, 0, false, errors.Errorf("parsing the longitude string err:%v", err)
 
