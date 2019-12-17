@@ -318,19 +318,19 @@ func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, dat
 	}
 	fileName := "patrol.xml"
 	fileContent := []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<ns2:patrol xmlns:ns2="http://www.smartconservationsoftware.org/xml/1.2/patrol" patrolType="GROUND" startDate="2019-06-13" endDate="2019-06-13" isArmed="false" id="SMART_000007">
+<ns2:patrol xmlns:ns2="http://www.smartconservationsoftware.org/xml/1.2/patrol" patrolType="GROUND" startDate="2019-06-13" endDate="2019-06-13" isArmed="false" id="SMART_000001">
     <ns2:objective>
         <ns2:description></ns2:description>
     </ns2:objective>
     <ns2:team languageCode="en" value="Community Team 1"/>
     <ns2:station languageCode="en" value="Fixed Patrol Post 1"/>
     <ns2:legs startDate="2019-06-13" endDate="2019-06-13" id="1">
-        <ns2:transportType languageCode="en" value="Foot"/>
+        <ns2:transportType languageCode="en" value="Research and Monitoring"/>
         <ns2:members givenName="David" familyName="Aliata" employeeId="195000012" isPilot="false" isLeader="true"/>
 		<ns2:days date="2019-06-13" startTime="00:00:00" endTime="23:59:59" restMinutes="0.0">
 			<ns2:track distance="0.05490675941109657" geom="` + geo + `"/>
 		</ns2:days>
-        <ns2:mandate languageCode="en" value="Reasearch and Monitoring"/>
+        <ns2:mandate languageCode="en" value="Research and Monitoring"/>
     </ns2:legs>
 	<ns2:comment></ns2:comment>
 </ns2:patrol>`)
