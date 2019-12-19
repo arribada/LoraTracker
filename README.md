@@ -7,6 +7,7 @@ TODO:
     backloging in connect might be  possible by providing a date with the alert api call.
     backlogging in Prometheus is possible, but tricky
     sending a single update with the lowset data rate setting takes 1-2 minutes so the speed for sending backlogs is not enough. need add an option to increase the speed based on the signal strength.
+ - when the gps hasn't changed too much just send 1 to indicate the same position.
  - make  the demo.
 
 

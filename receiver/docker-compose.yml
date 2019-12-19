@@ -88,7 +88,7 @@ services:
       POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
   lora-connect:
-    image: arribada/lora-connect@sha256:5888d17ba9b391c034f1470470e8e4b8e092cc6c0e146c7670e9cc5305e00111
+    image: arribada/lora-connect@sha256:fa724ad18e8919412cc7e22aedecdd0d855a4f863122ca30b3f754c304a8b2cd
   packet-forwarder:
     image: arribada/packet-forwarder@sha256:7ea7afe7ecc5080be0e882e3f310c373bd8a29503c6c647063fad40ba7d76d60
     privileged: true

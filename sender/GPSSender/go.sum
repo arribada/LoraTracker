@@ -13,6 +13,10 @@ github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-201912
 github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-20191217110411-f8fd086a81d0/go.mod h1:3Su93SfgUflZUBmdLiSZ351gW8oSyLLMxk0USmz51L8=
 github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-20191217110752-9c2e87c3d7b9 h1:g0OX68dPpY/dq9gTM91+mECBYHGF/Hxqq2GUZH35Kl0=
 github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-20191217110752-9c2e87c3d7b9/go.mod h1:3Su93SfgUflZUBmdLiSZ351gW8oSyLLMxk0USmz51L8=
+github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-20191219172411-b56cc47b2434 h1:TxULvKL+Q0hpxXn4MHkqrMBcGdftferujeyA92AnZ9Y=
+github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-20191219172411-b56cc47b2434/go.mod h1:3Su93SfgUflZUBmdLiSZ351gW8oSyLLMxk0USmz51L8=
+github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-20191219172637-7ea3025b2d8d h1:iRrhFQk2Xft+s532vCi9BbAIYcqFAzoDyAS/DE306kk=
+github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts v0.0.0-20191219172637-7ea3025b2d8d/go.mod h1:3Su93SfgUflZUBmdLiSZ351gW8oSyLLMxk0USmz51L8=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
