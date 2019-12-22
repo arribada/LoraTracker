@@ -55,24 +55,22 @@ func main() {
 	}
 
 	attempt := 1
-	fake := "GPGGA,215147.000,4226.8739,N,02724.9090,E,1,10,1.00,28.8,M,37.8,M,,"
+	var fakeGPSdata = nmea.GGA{
+		Latitude:  42.695109,
+		Longitude: 23.360378,
+	}
 	if os.Getenv("SEND_FAKE_GPS") != "" {
-		lat, long, _, err := alerts.Parse(os.Getenv("SEND_FAKE_GPS"))
+		fakeLat, fakeLong, _, err := alerts.Parse(os.Getenv("SEND_FAKE_GPS"))
 		if err == nil {
+			fakeGPSdata.Latitude = fakeLat
+			fakeGPSdata.Longitude = fakeLong
 			if os.Getenv("DEBUG") != "" {
-				log.Println("using coordinates from the fake enf var:", lat, long)
+				log.Println("using coordinates from the fake enf var:", fakeLat, fakeLong)
 			}
-			fake = "GPGGA,215147.000," + nmea.FormatGPS(lat) + ",N," + nmea.FormatGPS(long) + ",E,1,10,1.00,28.8,M,37.8,M,,"
 		} else if os.Getenv("DEBUG") != "" {
 			log.Println("SEND_FAKE_GPS env didn't include valid coordinates to will the default ones in Bulgaria. err:", err)
 		}
 	}
-	fakeParsed, err := nmea.Parse("$" + fake + "*" + nmea.Checksum(fake))
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Set an initial GPS to the fake ones and than will be overwritten by the first available GPS coordinates.
-	var fakeGPSdata nmea.GGA = fakeParsed.(nmea.GGA)
 	invalidCount := 0
 	for {
 		dataGPS := <-gps.channel()
