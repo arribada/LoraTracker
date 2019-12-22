@@ -71,23 +71,25 @@ func main() {
 			log.Println("SEND_FAKE_GPS env didn't include valid coordinates to will the default ones in Bulgaria. err:", err)
 		}
 	}
+
 	invalidCount := 0
 	for {
+		if invalidCount > 50 {
+			log.Println("reseting the gps module for too many invalid gps fixes:", invalidCount)
+			if err := gps.reset(); err != nil {
+				log.Fatal(err)
+			}
+			gps, err = newGPS(debug)
+			if err != nil {
+				log.Fatal("failed to enable gps err:", err)
+			}
+			invalidCount = 0
+		}
+
 		dataGPS := <-gps.channel()
 		// Send only GPS data if it is valid.
 		if dataGPS.FixQuality == nmea.Invalid {
 			invalidCount++
-			if invalidCount > 50 {
-				log.Println("reseting the gps module for too many invalid gps fixes:", invalidCount)
-				if err := gps.reset(); err != nil {
-					log.Fatal(err)
-				}
-				gps, err = newGPS(debug)
-				if err != nil {
-					log.Fatal("failed to enable gps err:", err)
-				}
-				invalidCount = 0
-			}
 			if os.Getenv("SEND_FAKE_GPS") == "" {
 				if debug {
 					log.Println("skipped sending an invalid data:", dataGPS, " count:", invalidCount)
