@@ -62,7 +62,7 @@ func main() {
 			if os.Getenv("DEBUG") != "" {
 				log.Println("using coordinates from the fake enf var:", lat, long)
 			}
-			fake = "GPGGA,215147.000," + fmt.Sprintf("%f", lat*100) + ",N," + fmt.Sprintf("%f", long*100) + ",E,1,10,1.00,28.8,M,37.8,M,,"
+			fake = "GPGGA,215147.000," + fmt.Sprintf("%f", nmea.FormatGPS(lat)) + ",N," + fmt.Sprintf("%f", nmea.FormatGPS(long)) + ",E,1,10,1.00,28.8,M,37.8,M,,"
 		} else if os.Getenv("DEBUG") != "" {
 			log.Println("SEND_FAKE_GPS env didn't include valid coordinates to will the default ones in Bulgaria. err:", err)
 		}
