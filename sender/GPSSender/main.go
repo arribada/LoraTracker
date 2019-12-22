@@ -67,12 +67,12 @@ func main() {
 			log.Println("SEND_FAKE_GPS env didn't include valid coordinates to will the default ones in Bulgaria. err:", err)
 		}
 	}
-	parsed, err := nmea.Parse("$" + fake + "*" + nmea.Checksum(fake))
+	fakeParsed, err := nmea.Parse("$" + fake + "*" + nmea.Checksum(fake))
 	if err != nil {
 		log.Fatal(err)
 	}
 	// Set an initial GPS to the fake ones and than will be overwritten by the first available GPS coordinates.
-	var lastGPSdata nmea.GGA = parsed.(nmea.GGA)
+	var fakeGPSdata nmea.GGA = fakeParsed.(nmea.GGA)
 	invalidCount := 0
 	for {
 		dataGPS := <-gps.channel()
@@ -96,7 +96,7 @@ func main() {
 				}
 				continue
 			}
-			dataGPS = lastGPSdata
+			dataGPS = fakeGPSdata
 			log.Println("the GPS returned invalid data so sending a fake one")
 		}
 		// When HDOP precision is set,
@@ -110,8 +110,6 @@ func main() {
 			}
 		}
 		invalidCount = 0
-
-		lastGPSdata = dataGPS
 
 		// The amount of data that can be send is limited by region and dr.
 		// If the received data is empty should increase the dr settings of the lora module.
@@ -178,7 +176,7 @@ func newGPS(debug bool) (*gps, error) {
 			default:
 			}
 			if err != nil {
-				log.Fatalf("reading gps serial err:", err)
+				log.Fatal("reading gps serial err:", err)
 			}
 			line = strings.TrimSpace(line)
 			parsed, err := nmea.Parse(line)
