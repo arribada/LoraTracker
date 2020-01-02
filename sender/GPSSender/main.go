@@ -92,7 +92,7 @@ func main() {
 			invalidCount++
 			if os.Getenv("SEND_FAKE_GPS") == "" {
 				if debug {
-					log.Println("skipped sending an invalid data:", dataGPS, " count:", invalidCount)
+					log.Printf("skipped sending an invalid data:%v invalid count:%v", dataGPS, invalidCount)
 				}
 				continue
 			}
@@ -102,9 +102,10 @@ func main() {
 		// When HDOP precision is set,
 		// skip sending anything below the threshold.
 		if HDOP != -1 {
+			invalidCount++
 			if dataGPS.HDOP >= HDOP {
 				if debug {
-					log.Printf("skip sending low accuracy GPS accuracy threshold:%v  data:%v", HDOP, dataGPS)
+					log.Printf("skip sending low accuracy GPS accuracy data HDOP threshold:%v, current HDOP:%v, invalid count:%v", HDOP, dataGPS.HDOP, invalidCount)
 				}
 				continue
 			}
