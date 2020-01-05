@@ -192,6 +192,14 @@ func newGPS(debug bool) (*gps, error) {
 				default:
 				}
 			}
+			if f := os.Getenv("SEND_FREQ"); f != "" {
+				freq, err := strconv.Atoi(f)
+				if err == nil {
+					time.Sleep(time.Duration(freq) * time.Second)
+					continue
+				}
+				log.Println("couldn't parse the SEND_FREQ env variable:", err)
+			}
 			time.Sleep(10 * time.Second)
 		}
 	}()
