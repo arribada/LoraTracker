@@ -27,6 +27,16 @@ func main() {
 		log.Println("displaying debug logs")
 	}
 
+	if f := os.Getenv("SEND_FREQ"); f != "" {
+		freq, err := strconv.Atoi(f)
+		if err == nil {
+			log.Println("send frequency set to :", freq)
+		} else {
+			log.Println("couldn't parse the SEND_FREQ env variable:", err)
+			os.Unsetenv("SEND_FREQ")
+		}
+	}
+
 	h := os.Getenv("HDOP")
 	HDOP := float64(-1)
 	if h != "" {
@@ -130,6 +140,14 @@ func main() {
 			lora, _ = newLoraConnection(debug)
 			continue
 		}
+		if f := os.Getenv("SEND_FREQ"); f != "" {
+			freq, err := strconv.Atoi(f)
+			if err == nil {
+				time.Sleep(time.Duration(freq) * time.Second)
+			} else {
+				log.Println("couldn't parse the SEND_FREQ env variable:", err)
+			}
+		}
 
 		signal, err := lora.Signal()
 		if err != nil {
@@ -191,14 +209,6 @@ func newGPS(debug bool) (*gps, error) {
 				case gps.ch <- dataGPS: // Don't block when the reciver is not ready.
 				default:
 				}
-			}
-			if f := os.Getenv("SEND_FREQ"); f != "" {
-				freq, err := strconv.Atoi(f)
-				if err == nil {
-					time.Sleep(time.Duration(freq) * time.Second)
-					continue
-				}
-				log.Println("couldn't parse the SEND_FREQ env variable:", err)
 			}
 			time.Sleep(10 * time.Second)
 		}
