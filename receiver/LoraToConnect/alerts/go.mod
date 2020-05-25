@@ -1,1 +1,0 @@
-module github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts

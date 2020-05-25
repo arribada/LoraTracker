@@ -12,9 +12,9 @@ services:
         global:
           scrape_interval:     5s
         scrape_configs:
-          - job_name: 'lora-connect'
+          - job_name: 'lora-gps-server'
             static_configs:
-            - targets: ['lora-connect:8070']
+            - targets: ['lora-gps-server:8070']
         alerting:
           alertmanagers:
           - static_configs:
@@ -87,8 +87,8 @@ services:
     environment:
       POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
-  lora-connect:
-    image: arribada/lora-connect@sha256:fa724ad18e8919412cc7e22aedecdd0d855a4f863122ca30b3f754c304a8b2cd
+  lora-gps-server:
+    image: arribada/lora-gps-server@sha256:fa724ad18e8919412cc7e22aedecdd0d855a4f863122ca30b3f754c304a8b2cd
   packet-forwarder:
     image: arribada/packet-forwarder@sha256:7ea7afe7ecc5080be0e882e3f310c373bd8a29503c6c647063fad40ba7d76d60
     privileged: true

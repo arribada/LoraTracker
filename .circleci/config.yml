@@ -7,8 +7,8 @@ workflows:
   publish:
     jobs:
       - docker/publish:
-          containerName: lora-connect
-          buildContext: receiver/LoraToConnect
+          containerName: lora-gps-server
+          buildContext: receiver/LoraToGPSServer
           context: org-context
           filters:
             branches:

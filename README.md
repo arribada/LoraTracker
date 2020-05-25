@@ -8,7 +8,8 @@ TODO:
     backlogging in Prometheus is possible, but tricky
     sending a single update with the lowset data rate setting takes 1-2 minutes so the speed for sending backlogs is not enough. need add an option to increase the speed based on the signal strength.
  - when the gps hasn't changed too much just send 1 to indicate the same position.
- - make  the demo.
+ - refactor the metrics to be global for all handlers instead of putting it in the smartConnect handler.
+ - the concetrator hangs sometime so reset it if it doesn't receive any packets in 10mins.
 
 
 # Setup Pager duty account for the alerting(optional).
@@ -134,7 +135,7 @@ headers:
     SMARTuser: smart
     SMARTpass: smart
     SMARTDesktopFile: # Optional header if you want to create an upload to Smart Desktop. See the section for Smart Desktop setup.
-Uplink data URL: http://lora-connect:8070
+Uplink data URL: http://lora-gps-server:8070
 ```
 ## LoraGpsSender setup
  - Env vars

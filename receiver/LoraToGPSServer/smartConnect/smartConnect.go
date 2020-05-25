@@ -1,4 +1,4 @@
-package alerts
+package smartConnect
 
 import (
 	"bytes"
@@ -107,13 +107,13 @@ func (s *Handler) incLastUpdateTime() {
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		s.httpError(w, "unimplemented path:"+r.URL.Path, http.StatusNotImplemented)
+	if r.URL.Path != "/smartConnect" {
+		httpError(w, "unimplemented path:"+r.URL.Path, http.StatusNotImplemented)
 		return
 	}
 	c, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		s.httpError(w, "reading request body err:"+err.Error(), http.StatusBadRequest)
+		httpError(w, "reading request body err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -124,35 +124,35 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	data := &DataUpPayload{}
 	err = json.Unmarshal(c, data)
 	if err != nil {
-		s.httpError(w, "unmarshaling request body err:"+err.Error(), http.StatusBadRequest)
+		httpError(w, "unmarshaling request body err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	server, ok := r.Header["Smartserver"]
 	if !ok || len(server) != 1 {
-		s.httpError(w, "missing or incorrect SmartServer header", http.StatusBadRequest)
+		httpError(w, "missing or incorrect SmartServer header", http.StatusBadRequest)
 		return
 	}
 
 	_, err = url.ParseRequestURI(server[0])
 	if err != nil {
-		s.httpError(w, "invalid SmartServer url format expected: https://serverNameOrIP", http.StatusBadRequest)
+		httpError(w, "invalid SmartServer url format expected: https://serverNameOrIP", http.StatusBadRequest)
 		return
 	}
 
 	user, ok := r.Header["Smartuser"]
 	if !ok || len(user) != 1 {
-		s.httpError(w, "missing or incorrect SmartUser header", http.StatusBadRequest)
+		httpError(w, "missing or incorrect SmartUser header", http.StatusBadRequest)
 		return
 	}
 	pass, ok := r.Header["Smartpass"]
 	if !ok || len(pass) != 1 {
-		s.httpError(w, "missing or incorrect SmartPass header", http.StatusBadRequest)
+		httpError(w, "missing or incorrect SmartPass header", http.StatusBadRequest)
 		return
 	}
 	carea, ok := r.Header["Smartcarea"]
 	if !ok || len(carea) != 1 {
-		s.httpError(w, "missing or incorrect SmartCarea header", http.StatusBadRequest)
+		httpError(w, "missing or incorrect SmartCarea header", http.StatusBadRequest)
 		return
 	}
 
@@ -164,11 +164,11 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.careasBuf[carea[0]]; !ok {
 		exists, err := s.careaExists(carea[0])
 		if err != nil {
-			s.httpError(w, "checking if a  conservation area exists, err:"+err.Error(), http.StatusBadRequest)
+			httpError(w, "checking if a  conservation area exists, err:"+err.Error(), http.StatusBadRequest)
 			return
 		}
 		if !exists {
-			s.httpError(w, "conservation area doesn't exist", http.StatusNotFound)
+			httpError(w, "conservation area doesn't exist", http.StatusNotFound)
 			return
 		}
 
@@ -180,24 +180,23 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.createAlert(w, r, data); err != nil {
-		s.httpError(w, "creating an alert err:"+err.Error(), http.StatusBadRequest)
+		httpError(w, "creating an alert err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 	log.Println("alert created for application:", data.ApplicationName, ",device id:", genDevID(data))
-
 
 	fileContent, ok := r.Header["Smartdesktopfile"]
 	if !ok || len(fileContent) != 1 {
 		if os.Getenv("DEBUG") != "" {
 			log.Printf("Smartdesktopfile header is empty so NOT creating an upload for SMART desktop")
 		}
-	}else{
+	} else {
 		if err := s.createPatrolUpload(w, r, []byte(fileContent[0])); err != nil {
-			s.httpError(w,"creating an upload err:"+ err.Error(), http.StatusBadRequest)
+			httpError(w, "creating an upload err:"+err.Error(), http.StatusBadRequest)
 		}
 		log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
 	}
-	
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -320,8 +319,8 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 	return nil
 }
 
-func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request,fileContent []byte) error {
-	 _,_ = wkt.Marshal(geom.NewPoint(geom.XY).MustSetCoords(geom.Coord{1, 2}))
+func (s *Handler) createPatrolUpload(w http.ResponseWriter, r *http.Request, fileContent []byte) error {
+	_, _ = wkt.Marshal(geom.NewPoint(geom.XY).MustSetCoords(geom.Coord{1, 2}))
 	// if err != nil {
 	// 	return fmt.Errorf("marshal geo location err:%v", err)
 	// }
@@ -514,11 +513,6 @@ func (s *Handler) createAlertType(label string) (string, error) {
 	return response.UUID, nil
 }
 
-func (s *Handler) httpError(w http.ResponseWriter, error string, code int) {
-	log.Println(error)
-	http.Error(w, error, code)
-}
-
 func genDevID(data *DataUpPayload) string {
 	return data.DeviceName + "-" + data.DevEUI.String()
 }
@@ -626,4 +620,9 @@ func distance(lat1 float64, lng1 float64, lat2 float64, lng2 float64, unit ...st
 	}
 
 	return dist
+}
+
+func httpError(w http.ResponseWriter, error string, code int) {
+	log.Println(error)
+	http.Error(w, error, code)
 }

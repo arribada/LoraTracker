@@ -9,7 +9,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts"
+	"github.com/arribada/SMARTLoraTracker/receiver/LoraToGPSServer/smartConnect"
+	"github.com/arribada/SMARTLoraTracker/receiver/LoraToGPSServer/traccar"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -30,13 +32,15 @@ func main() {
 		os.Exit(2)
 	}
 
-	alertsHandler := alerts.NewHandler()
+	smartConnectHandler := smartConnect.NewHandler()
+	traccarHandler := traccar.NewHandler()
 
 	log.Println("starting server at port:", *receivePort)
 	if os.Getenv("DEBUG") != "" {
 		log.Println("displaying debug logs")
 	}
-	http.Handle("/", alertsHandler)
+	http.Handle("/smartConnect", smartConnectHandler)
+	http.Handle("/traccar", traccarHandler)
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":"+*receivePort, nil))
 }
