@@ -9,6 +9,7 @@ TODO:
     sending a single update with the lowset data rate setting takes 1-2 minutes so the speed for sending backlogs is not enough. need add an option to increase the speed based on the signal strength.
  - when the gps hasn't changed too much just send 1 to indicate the same position.
  - refactor the metrics to be global for all handlers instead of putting it in the smartConnect handler.
+ - check if can deduplicate some code between smart connect and traccar
  - the concetrator hangs sometime so reset it if it doesn't receive any packets in 10mins.
 
 
@@ -26,9 +27,9 @@ TODO:
 
 # Initial Setup on Balena cloud
 
-Create an application for the sender and the receiver: `LoraGpsSender`, `SMARTLoraReciever`.
+Create an application for the sender and the receiver: `LoraGpsSender`, `LoraReciever`.
 
-## SMARTLoraReciever Setup
+## LoraReciever Setup
 
 - Fleet configuration
 ```
@@ -58,7 +59,7 @@ NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The
 
 ```
 cd ./receiver
-balena push SMARTLoraReciever
+balena push LoraReciever
 ```
 - Service Variables for the `chirpstack-appserver` service.
 > replace the `...` with the value from the POSTGRES_PASSWORD env variable.
@@ -126,6 +127,9 @@ tab: KEYS
 ```
 Application key: generate random # write it down as it will be used when setting up the sender
 ```
+
+#### SMART connect integration(optional).
+
 - Applications/gpsTracker/Integrations/Create
 ```
 kind: HTTP
@@ -135,8 +139,21 @@ headers:
     SMARTuser: smart
     SMARTpass: smart
     SMARTDesktopFile: # Optional header if you want to create an upload to Smart Desktop. See the section for Smart Desktop setup.
-Uplink data URL: http://lora-gps-server:8070
+Uplink data URL: http://lora-gps-server:8070/smartConnect
 ```
+
+#### Traccar integration(optional).
+- Applications/gpsSender/Integrations/http
+```
+headers:
+    traccarServer: http://traccar:5055
+Uplink data URL: http://lora-gps-server:8070/traccar
+
+# note multiple uplink urls are separated by coma:
+# http://lora-gps-server:8070/smartConnect,http://lora-gps-server:8070/traccar
+
+```
+
 ## LoraGpsSender setup
  - Env vars
 ```
@@ -155,7 +172,7 @@ RESIN_HOST_CONFIG_dtoverlay pi3-miniuart-bt
 
 ```
 cd ./sender
-balena push ApplicationName
+balena push LoraGpsSender
 ```
 
 ## Smart Desktop setup

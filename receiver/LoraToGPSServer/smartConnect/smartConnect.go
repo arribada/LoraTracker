@@ -107,10 +107,6 @@ func (s *Handler) incLastUpdateTime() {
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/smartConnect" {
-		httpError(w, "unimplemented path:"+r.URL.Path, http.StatusNotImplemented)
-		return
-	}
 	c, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		httpError(w, "reading request body err:"+err.Error(), http.StatusBadRequest)

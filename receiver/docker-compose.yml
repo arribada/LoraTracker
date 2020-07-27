@@ -2,7 +2,7 @@ version: "2.1"
 
 services:
   env-config:
-    image: arribada/env-config@sha256:69b671da6d29ff43e51e36a3e9a540e0776ea5a47ca7a4af8029a3dccf60e02e
+    image: arribada/env-config@sha256:f17114b261b263dba730c08fcb6e9ee6bc63cd087e18593f33eccb9aeed575fe
     volumes:
     - configs:/configs/
     command:
@@ -74,6 +74,21 @@ services:
         psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname="chirpstack_as" <<-EOSQL
           create extension hstore;
         EOSQL
+      TRACCAR_xml: |-
+        <?xml version='1.0' encoding='UTF-8'?>
+
+        <!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+
+        <properties>
+
+            <entry key='config.default'>./conf/default.xml</entry>
+
+            <entry key='database.driver'>org.h2.Driver</entry>
+            <entry key='database.url'>jdbc:h2:./data/database</entry>
+            <entry key='database.user'>sa</entry>
+            <entry key='database.password'></entry>
+            <entry key='logger.file'>/dev/stdout</entry>
+        </properties>
   smart-postgres:
     image: arribada/smart-connect-postgis@sha256:96787a45e1146ac3cd88cad15aa89243d74738e574e6b9730a07415616e3e521
     volumes:
@@ -88,7 +103,7 @@ services:
       POSTGRES_HOSTNAME: smart-postgres
       POSTGRES_PORT: 5432
   lora-gps-server:
-    image: arribada/lora-gps-server@sha256:fa724ad18e8919412cc7e22aedecdd0d855a4f863122ca30b3f754c304a8b2cd
+    image: arribada/lora-gps-server@sha256:ae4ea79dfa5bc158eff52ad4c595a92c59782493388b93b69014c5679e96c755
   packet-forwarder:
     image: arribada/packet-forwarder@sha256:7ea7afe7ecc5080be0e882e3f310c373bd8a29503c6c647063fad40ba7d76d60
     privileged: true
@@ -323,6 +338,18 @@ services:
       - 9093:9093
     command:
       - --config.file=/configs/ALERTMANAGER_CONFIG
+  traccar:
+    image: arribada/traccar:master-alpine@sha256:3a2a49b4a2226be1e144daee570875647679d159fb4572e503c09f03d68971dd
+    volumes:
+    - configs:/configs/
+    - traccar-database:/opt/traccar/data
+    ports:
+      - 80:8082
+      - 5055:5055
+    command:
+     - -jar
+     - tracker-server.jar
+     - /configs/TRACCAR.xml
 
 volumes:
   smart-postgres:
@@ -331,4 +358,5 @@ volumes:
   chirpstack-redis:
   prometheus:
   alertmanager:
+  traccar-database:
   configs:
