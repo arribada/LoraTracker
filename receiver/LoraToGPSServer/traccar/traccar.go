@@ -60,24 +60,23 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lat, ok := data.Object["lat"]
+	// When resent is more than one it means no new gps coordinates are available and
+	// the latest ones were resent so can also be ignored.
+	resent := false
+	if _, ok := data.Object["gps_resend"]; ok {
+		resent = true
+	}
 	latF := lat.(float64)
-	if !ok || latF == 0 {
+	if !ok || latF == 0 || resent {
 		if os.Getenv("DEBUG") != "" {
-			log.Printf("skipping data with missing gps lat, body:%+v", data)
+			log.Printf("skipping data with incorrect gps coords, body:%+v", data)
 		}
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	lon, ok := data.Object["lon"]
+	lon := data.Object["lon"]
 	lonF := lon.(float64)
-	if !ok || lonF == 0 {
-		if os.Getenv("DEBUG") != "" {
-			log.Printf("skipping data with missing gps lon, body:%+v", data)
-		}
-		w.WriteHeader(http.StatusOK)
-		return
-	}
 
 	var snr float64
 	var rssi int
