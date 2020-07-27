@@ -3,13 +3,16 @@
 
 
 TODO:
+ - add to the readme for using the new gps tags - paylod, decode codecs.
+ - the smart connect code doesn't handle data from the new gps tags.
+ - check if can deduplicate some code between smart connect and traccar
+
  - how to deal with backloging when the sender is out of range?
     backloging in connect might be  possible by providing a date with the alert api call.
     backlogging in Prometheus is possible, but tricky
     sending a single update with the lowset data rate setting takes 1-2 minutes so the speed for sending backlogs is not enough. need add an option to increase the speed based on the signal strength.
  - when the gps hasn't changed too much just send 1 to indicate the same position.
  - refactor the metrics to be global for all handlers instead of putting it in the smartConnect handler.
- - check if can deduplicate some code between smart connect and traccar
  - the concetrator hangs sometime so reset it if it doesn't receive any packets in 10mins.
 
 
@@ -27,9 +30,9 @@ TODO:
 
 # Initial Setup on Balena cloud
 
-Create an application for the sender and the receiver: `LoraGpsSender`, `LoraReciever`.
+Create an application for the sender and the receiver: `LoraGpsSender`, `LoraGpsReciever`.
 
-## LoraReciever Setup
+## LoraGpsReciever Setup
 
 - Fleet configuration
 ```
@@ -59,7 +62,7 @@ NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The
 
 ```
 cd ./receiver
-balena push LoraReciever
+balena push LoraGpsReciever
 ```
 - Service Variables for the `chirpstack-appserver` service.
 > replace the `...` with the value from the POSTGRES_PASSWORD env variable.
