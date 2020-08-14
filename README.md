@@ -77,6 +77,9 @@ Login: admin admin
 SMART connect: https://deviceIPorDomain:8443/server<br/>
 Login: smart smart
 
+TracCar: https://deviceIPorDomain<br/>
+Login: admin    admin
+
 ### Setup chirpstack app server
 
 - Network-servers/Add
@@ -184,6 +187,7 @@ Uplink data URL: http://lora-gps-server:8070/traccar
 > multiple uplink urls are separated by coma:<br/>
 > http://lora-gps-server:8070/smartConnect, http://lora-gps-server:8070/traccar
 
+In the traccar sofware add each tracker as device with its corresponding Device EUI(no empty spaces between the pairs).
 
 ## LoraGpsSender setup
  - Env vars
