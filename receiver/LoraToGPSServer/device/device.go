@@ -37,7 +37,7 @@ func Parse(r *http.Request, metrics *Metrics) (*Data, error) {
 		return nil, errors.Wrap(err, "reading request body")
 	}
 
-	if os.Getenv("DEBUG") != "" {
+	if os.Getenv("DEBUG") == "1" {
 		log.Printf("incoming request body:%v RemoteAddr:%v headers:%+v \n", string(c), r.RemoteAddr, r.Header)
 	}
 
@@ -73,7 +73,7 @@ func Parse(r *http.Request, metrics *Metrics) (*Data, error) {
 	metrics.UpdateSignals(dataParsed)
 
 	if len(data.RXInfo) == 0 {
-		if os.Getenv("DEBUG") != "" {
+		if os.Getenv("DEBUG") == "1" {
 			log.Println("received lora data doesn't include gateway meta data")
 		}
 	} else {
@@ -135,7 +135,7 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 
 	// Non GPS data.
 	if data.FPort != 1 && data.FPort != 12 {
-		if os.Getenv("DEBUG") != "" {
+		if os.Getenv("DEBUG") == "1" {
 			log.Printf("skipping non gps data, fport:%+v", data.FPort)
 		}
 		return dataParsed, nil
@@ -244,7 +244,7 @@ func NewMetrics() *Metrics {
 
 func (s *Metrics) UpdateSignals(data *Data) {
 	if len(data.Payload.RXInfo) == 0 {
-		if os.Getenv("DEBUG") != "" {
+		if os.Getenv("DEBUG") == "1" {
 			log.Println("received lora data doesn't include gateway meta data")
 		}
 	} else {

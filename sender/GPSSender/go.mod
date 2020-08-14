@@ -13,4 +13,5 @@ require (
 )
 
 replace github.com/arribada/LoraTracker/sender/GPSSender/pkg/rak811 => ./pkg/rak811
-replace github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device => ../../receiver/LoraToGPSServer/device
+// The parent directories are not copied by balena push so this relative path doesn't exist.
+// replace github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device => ../../receiver/LoraToGPSServer/device

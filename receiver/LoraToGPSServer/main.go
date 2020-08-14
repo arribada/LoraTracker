@@ -38,7 +38,7 @@ func main() {
 	traccarHandler := traccar.NewHandler(metrics)
 
 	log.Println("starting server at port:", *receivePort)
-	if os.Getenv("DEBUG") != "" {
+	if os.Getenv("DEBUG") == "1" {
 		log.Println("with debug logs")
 	}
 

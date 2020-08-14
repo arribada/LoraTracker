@@ -87,7 +87,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	s.metrics.UpdateSignals(data)
 
-	if !data.Valid && os.Getenv("DEBUG") != "" {
+	if !data.Valid && os.Getenv("DEBUG") == "1" {
 		log.Printf("skipping data with invalid gps coords, body:%+v", data)
 		w.WriteHeader(http.StatusOK)
 		return
@@ -152,7 +152,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	fileContent, ok := r.Header["Smartdesktopfile"]
 	if !ok || len(fileContent) != 1 {
-		if os.Getenv("DEBUG") != "" {
+		if os.Getenv("DEBUG") == "1" {
 			log.Printf("Smartdesktopfile header is empty so NOT creating an upload for SMART desktop")
 		}
 	} else {
@@ -250,7 +250,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *devi
 		return err
 	}
 
-	if os.Getenv("DEBUG") != "" {
+	if os.Getenv("DEBUG") == "1" {
 		log.Printf("SMART connect reply status:%v, body:%v", res.StatusCode, string(body))
 	}
 	err = json.Unmarshal(body, response)
@@ -355,7 +355,7 @@ func (s *Handler) careaExists(ca string) (bool, error) {
 		return false, err
 	}
 
-	if os.Getenv("DEBUG") != "" {
+	if os.Getenv("DEBUG") == "1" {
 		log.Println("CA area check response body:", string(body))
 	}
 

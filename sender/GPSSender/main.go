@@ -22,7 +22,7 @@ import (
 func main() {
 	log.SetFlags(log.Ltime | log.Lshortfile)
 
-	debug := os.Getenv("DEBUG") != ""
+	debug := os.Getenv("DEBUG") == "1"
 	if debug {
 		log.Println("with debug logs")
 	}
@@ -51,7 +51,7 @@ func main() {
 	if debug {
 		log.Println("enabling gps module")
 	}
-	gps, err := newGPS(debug)
+	gps, err := newGPS()
 	if err != nil {
 		log.Fatal("failed to enable gps err:", err)
 	}
@@ -59,7 +59,7 @@ func main() {
 	if debug {
 		log.Println("enabling lora module")
 	}
-	lora, err := newLoraConnection(debug)
+	lora, err := newLoraConnection()
 	if err != nil {
 		log.Fatal("failed to create lora connection err:", err)
 	}
@@ -74,10 +74,10 @@ func main() {
 		if err == nil {
 			fakeGPSdata.Latitude = fakeData.Lat
 			fakeGPSdata.Longitude = fakeData.Lon
-			if os.Getenv("DEBUG") != "" {
+			if os.Getenv("DEBUG") == "1" {
 				log.Println("using coordinates from the fake enf var:", fakeData.Lat, fakeData.Lon)
 			}
-		} else if os.Getenv("DEBUG") != "" {
+		} else if os.Getenv("DEBUG") == "1" {
 			log.Println("SEND_FAKE_GPS env didn't include valid coordinates to will the default ones in Bulgaria. err:", err)
 		}
 	}
@@ -89,7 +89,7 @@ func main() {
 			if err := gps.reset(); err != nil {
 				log.Fatal(err)
 			}
-			gps, err = newGPS(debug)
+			gps, err = newGPS()
 			if err != nil {
 				log.Fatal("failed to enable gps err:", err)
 			}
@@ -137,7 +137,7 @@ func main() {
 			// Attempt to register again.
 			log.Println(attempt, ":registration retry")
 			attempt++
-			lora, _ = newLoraConnection(debug)
+			lora, _ = newLoraConnection()
 			continue
 		}
 		if f := os.Getenv("SEND_FREQ"); f != "" {
@@ -169,14 +169,12 @@ type gps struct {
 	*serial.Port
 	*bufio.Reader
 	ch     chan nmea.GGA
-	debug  bool
 	closed chan struct{}
 }
 
-func newGPS(debug bool) (*gps, error) {
+func newGPS() (*gps, error) {
 	gps := &gps{
 		ch:     make(chan nmea.GGA),
-		debug:  debug,
 		closed: make(chan struct{}),
 	}
 
@@ -269,7 +267,7 @@ func (g *gps) setupPort() error {
 	if err != nil {
 		return errors.Wrapf(err, "selecting gps port")
 	}
-	if g.debug {
+	if os.Getenv("DEBUG") == "1" {
 		log.Println("selected gps port:", portPath)
 	}
 
@@ -318,7 +316,7 @@ func (g *gps) gerMTKAck(cmdID int64) bool {
 		if err != nil {
 			break
 		}
-		if g.debug {
+		if os.Getenv("DEBUG") == "1" {
 			log.Println("gps cmd ack response line:", line)
 		}
 		resp, err := nmea.Parse(strings.TrimSpace(line))
@@ -341,7 +339,7 @@ func (g *gps) close() error {
 	return g.Close()
 }
 
-func newLoraConnection(debug bool) (*rak811.Lora, error) {
+func newLoraConnection() (*rak811.Lora, error) {
 	appKey := os.Getenv("APP_KEY")
 	if appKey == "" {
 		log.Fatal("missing APP_KEY env variable")
@@ -408,7 +406,7 @@ func newLoraConnection(debug bool) (*rak811.Lora, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "set lora config with:%v", config)
 	}
-	if debug {
+	if os.Getenv("DEBUG") == "1" {
 		log.Print("lora module config set resp:", resp, " config:", config)
 	}
 
@@ -417,21 +415,21 @@ func newLoraConnection(debug bool) (*rak811.Lora, error) {
 	attempt := 1
 	now := time.Now()
 	for {
-		if debug {
+		if os.Getenv("DEBUG") == "1" {
 			log.Print("sending join request attempt:", attempt)
 		}
 		resp, err = lora.JoinOTAA()
 		if err != nil || attempt > 25 {
 			log.Println("Reseting the module due to a join request err:", err, "or too many attempts:", attempt)
 			lora.Close()
-			return newLoraConnection(debug)
+			return newLoraConnection()
 		}
 
 		if resp == rak811.STATUS_JOINED_SUCCESS {
 			log.Println("lora module joined, total join request duration:", time.Since(now))
 			break
 		}
-		if debug {
+		if os.Getenv("DEBUG") == "1" {
 			log.Print("unexpected gateway registration resp:", resp, " attempt:", attempt)
 		}
 		attempt++
