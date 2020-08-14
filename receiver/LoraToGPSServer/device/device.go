@@ -120,6 +120,7 @@ func Rpi(data string) (*Data, error) {
 		Lat:      lat,
 		Lon:      lon,
 		Metadata: map[string]string{},
+		Valid:    true,
 	}
 
 	singlePoints := len(coordinates) == 3 && coordinates[2] == "s"
