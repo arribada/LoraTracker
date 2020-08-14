@@ -116,15 +116,18 @@ func Rpi(data string) (*Data, error) {
 		return nil, errors.New("longitude outside acceptable values")
 	}
 
-	singlePoints := len(coordinates) == 3 && coordinates[2] == "s"
+	d := &Data{
+		Lat:      lat,
+		Lon:      lon,
+		Metadata: map[string]string{},
+	}
 
-	return &Data{
-		Lat: lat,
-		Lon: lon,
-		Metadata: map[string]string{
-			"s": strconv.FormatBool(singlePoints),
-		},
-	}, nil
+	singlePoints := len(coordinates) == 3 && coordinates[2] == "s"
+	if singlePoints {
+		d.Metadata["s"] = "true"
+	}
+
+	return d, nil
 }
 
 func Irnas(data *DataUpPayload) (*Data, error) {
