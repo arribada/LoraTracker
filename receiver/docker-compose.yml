@@ -350,6 +350,8 @@ services:
      - -jar
      - tracker-server.jar
      - /configs/TRACCAR.xml
+  lora-gps-server:
+    image: arribada/lora-gps-server@sha256:9ec76af30f552f9dca1658d8223d023eb112ef4501e34650acc1cd60e2eca349
 
 volumes:
   smart-postgres:
