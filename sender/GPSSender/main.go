@@ -70,12 +70,12 @@ func main() {
 		Longitude: 23.360378,
 	}
 	if os.Getenv("SEND_FAKE_GPS") != "" {
-		fakeLat, fakeLong, _, err := device.Rpi(os.Getenv("SEND_FAKE_GPS"))
+		fakeData, err := device.Rpi(os.Getenv("SEND_FAKE_GPS"))
 		if err == nil {
-			fakeGPSdata.Latitude = fakeLat
-			fakeGPSdata.Longitude = fakeLong
+			fakeGPSdata.Latitude = fakeData.Lat
+			fakeGPSdata.Longitude = fakeData.Lon
 			if os.Getenv("DEBUG") != "" {
-				log.Println("using coordinates from the fake enf var:", fakeLat, fakeLong)
+				log.Println("using coordinates from the fake enf var:", fakeData.Lat, fakeData.Lon)
 			}
 		} else if os.Getenv("DEBUG") != "" {
 			log.Println("SEND_FAKE_GPS env didn't include valid coordinates to will the default ones in Bulgaria. err:", err)
