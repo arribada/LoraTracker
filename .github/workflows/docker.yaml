@@ -3,18 +3,17 @@ jobs:
   push:
     runs-on: ubuntu-latest
     name: Push Docker image for LoraToGPSServer
-    defaults:
-      working-directory: receiver/LoraToGPSServer
     steps:
       - name: Checkout master
         uses: actions/checkout@master
       - name: Print Branch name
         run: 'echo running on branch ${GITHUB_REF##*/}'
       - name: Build and publish image
-        uses: ilteoood/docker_buildx@master
+        uses: arribada/docker_buildx@master
         with:
           publish: true
           tag: '${GITHUB_REF##*/}'
           imageName: arribada/lora-gps-server
           dockerHubUser: '${{ secrets.DOCKER_USER }}'
           dockerHubPassword: '${{ secrets.DOCKER_PASS }}'
+          buildContext: receiver/LoraToGPSServer
