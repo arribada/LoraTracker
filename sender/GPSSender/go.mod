@@ -1,11 +1,10 @@
-module github.com/arribada/SMARTLoraTracker/sender/GPSSender
+module github.com/arribada/LoraTracker/sender/GPSSender
 
 go 1.12
 
 require (
 	github.com/adrianmo/go-nmea v1.1.1-0.20191002192055-6384a696ae32
-	github.com/arribada/SMARTLoraTracker/receiver/LoraToGPSServer/smartConnect v0.0.0-20191219180031-642887275f82
-	github.com/arribada/SMARTLoraTracker/sender/GPSSender/pkg/rak811 v0.0.0-00010101000000-000000000000
+	github.com/arribada/LoraTracker/sender/GPSSender/pkg/rak811 v0.0.0-00010101000000-000000000000
 	github.com/brocaar/lorawan v0.0.0-20191115102621-6095d473cf60 // indirect
 	github.com/davecheney/gpio v0.0.0-20160912024957-a6de66e7e470 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
@@ -18,6 +17,6 @@ require (
 
 )
 
-replace github.com/arribada/SMARTLoraTracker/sender/GPSSender/pkg/rak811 => ./pkg/rak811
+replace github.com/arribada/LoraTracker/sender/GPSSender/pkg/rak811 => ./pkg/rak811
 
-// replace github.com/arribada/SMARTLoraTracker/receiver/LoraToGPSServer/smartConnect => ../../receiver/LoraToGPSServer/smartConnect
+// replace github.com/arribada/LoraTracker/receiver/LoraToGPSServer/smartConnect => ../../receiver/LoraToGPSServer/smartConnect

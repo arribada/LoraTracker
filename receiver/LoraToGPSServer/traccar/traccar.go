@@ -2,23 +2,21 @@ package traccar
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"runtime"
 	"strconv"
-	"time"
 
-	"github.com/brocaar/lorawan"
+	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device"
 )
 
 // NewHandler creates a new alert type handler.
-func NewHandler() *Handler {
+func NewHandler(metrics *device.Metrics) *Handler {
 	a := &Handler{
+		metrics: metrics,
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -31,71 +29,20 @@ func NewHandler() *Handler {
 // Handler is the alert type handler struct.
 type Handler struct {
 	httpClient *http.Client
+	metrics    *device.Metrics
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c, err := ioutil.ReadAll(r.Body)
+	data, err := device.Parse(r, s.metrics)
 	if err != nil {
-		httpError(w, "reading request body err:"+err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if os.Getenv("DEBUG") != "" {
-		log.Printf("incoming request body:%v RemoteAddr:%v headers:%+v \n", string(c), r.RemoteAddr, r.Header)
-	}
-
-	data := &DataUpPayload{}
-	err = json.Unmarshal(c, data)
-	if err != nil {
-		httpError(w, "unmarshaling request body err:"+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if data.FPort != 1 && data.FPort != 12 {
-		if os.Getenv("DEBUG") != "" {
-			log.Printf("skipping non gps data, fport:%+v", data.FPort)
-		}
+	if !data.Valid && os.Getenv("DEBUG") != "" {
+		log.Printf("skipping data with invalid gps coords, body:%+v", data)
 		w.WriteHeader(http.StatusOK)
 		return
-	}
-
-	lat, ok := data.Object["lat"]
-	// When resent is more than one it means no new gps coordinates are available and
-	// the latest ones were resent so can also be ignored.
-	resent := false
-	if _, ok := data.Object["gps_resend"]; ok {
-		resent = true
-	}
-	latF := lat.(float64)
-	if !ok || latF == 0 || resent {
-		if os.Getenv("DEBUG") != "" {
-			log.Printf("skipping data with incorrect gps coords, body:%+v", data)
-		}
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	lon := data.Object["lon"]
-	lonF := lon.(float64)
-
-	var snr float64
-	var rssi int
-	if len(data.RXInfo) == 0 {
-		if os.Getenv("DEBUG") != "" {
-			log.Println("received lora data doesn't include gateway meta data")
-		}
-	} else {
-		snr = data.RXInfo[0].LoRaSNR
-		rssi = data.RXInfo[0].RSSI
-	}
-
-	var batF float64
-	if bat, ok := data.Object["battery"]; ok {
-		batF = bat.(float64)
-	}
-
-	if os.Getenv("DEBUG") != "" {
-		log.Printf("incoming request unmarshaled body:%+v", data)
 	}
 
 	server, ok := r.Header["Traccarserver"]
@@ -117,13 +64,12 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := req.URL.Query()
-	q.Add("id", data.DevEUI.String())
-	q.Add("lat", fmt.Sprintf("%g", latF))
-	q.Add("lon", fmt.Sprintf("%g", lonF))
-	q.Add("battery", fmt.Sprintf("%g", batF))
-	q.Add("snr", fmt.Sprintf("%g", snr))
-	q.Add("rssi", strconv.Itoa(rssi))
-	q.Add("battery", fmt.Sprintf("%g", batF))
+	q.Add("id", data.Payload.DevEUI.String())
+	q.Add("lat", fmt.Sprintf("%g", data.Lat))
+	q.Add("lon", fmt.Sprintf("%g", data.Lon))
+	q.Add("battery", fmt.Sprintf("%g", data.Bat))
+	q.Add("snr", fmt.Sprintf("%g", data.Snr))
+	q.Add("rssi", strconv.Itoa(data.Rssi))
 	req.URL.RawQuery = q.Encode()
 
 	res, err := s.httpClient.Do(req)
@@ -134,51 +80,13 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer res.Body.Close()
 
 	if res.StatusCode/100 != 2 {
-		httpError(w, "unexpected response status code:"+strconv.Itoa(res.StatusCode)+"request:"+req.URL.RawQuery, http.StatusBadRequest)
+		httpError(w, "unexpected response status code:"+strconv.Itoa(res.StatusCode)+" request:"+req.URL.RawQuery, http.StatusBadRequest)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-}
 
-// DataUpPayload represents a data-up payload.
-type DataUpPayload struct {
-	ApplicationID   int64                  `json:"applicationID,string"`
-	ApplicationName string                 `json:"applicationName"`
-	DeviceName      string                 `json:"deviceName"`
-	DevEUI          lorawan.EUI64          `json:"devEUI"`
-	RXInfo          []RXInfo               `json:"rxInfo,omitempty"`
-	TXInfo          TXInfo                 `json:"txInfo"`
-	ADR             bool                   `json:"adr"`
-	FCnt            uint32                 `json:"fCnt"`
-	FPort           uint8                  `json:"fPort"`
-	Data            []byte                 `json:"data"`
-	Object          map[string]interface{} `json:"object,omitempty"`
-	Tags            map[string]string      `json:"tags,omitempty"`
-	Variables       map[string]string      `json:"-"`
-}
-
-// RXInfo contains the RX information.
-type RXInfo struct {
-	GatewayID lorawan.EUI64 `json:"gatewayID"`
-	Name      string        `json:"name"`
-	Time      *time.Time    `json:"time,omitempty"`
-	RSSI      int           `json:"rssi"`
-	LoRaSNR   float64       `json:"loRaSNR"`
-	Location  *Location     `json:"location"`
-}
-
-// TXInfo contains the TX information.
-type TXInfo struct {
-	Frequency int `json:"frequency"`
-	DR        int `json:"dr"`
-}
-
-// Location details.
-type Location struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Altitude  float64 `json:"altitude"`
+	log.Println("gps point created for application:", data.Payload.ApplicationName, ",device id:", data.ID)
 }
 
 func httpError(w http.ResponseWriter, err string, code int) {

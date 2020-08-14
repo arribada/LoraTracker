@@ -3,17 +3,12 @@
 
 
 TODO:
- - add to the readme for using the new gps tags - paylod, decode codecs.
- - the smart connect code doesn't handle data from the new gps tags.
- - check if can deduplicate some code between smart connect and traccar
 
  - how to deal with backloging when the sender is out of range?
     backloging in connect might be  possible by providing a date with the alert api call.
     backlogging in Prometheus is possible, but tricky
-    sending a single update with the lowset data rate setting takes 1-2 minutes so the speed for sending backlogs is not enough. need add an option to increase the speed based on the signal strength.
- - when the gps hasn't changed too much just send 1 to indicate the same position.
- - refactor the metrics to be global for all handlers instead of putting it in the smartConnect handler.
- - the concetrator hangs sometime so reset it if it doesn't receive any packets in 10mins.
+    sending a single update with the lowest data rate setting takes 1-2 minutes so the speed for sending backlogs is not enough. need add an option to increase the speed based on the signal strength.
+ - the concetrator hangs sometime so reset it if doesn't receive any packets in 10mins.
 
 
 # Setup Pager duty account for the alerting(optional).
@@ -96,13 +91,24 @@ server: gpsTracker
 Add gateway meta-data: selected
 ```
 - Device-profiles/Create
-```
-name: gpsTracker
-server: gpsTracker
-LoRaWAN MAC version: 1.0.3
-LoRaWAN Regional Parameters revision: A
-Join (OTAA / ABP): Device supports OTAA
-```
+    - For Rpi sender
+        ```
+        name: rpi
+        server: gpsTracker
+        LoRaWAN MAC version: 1.0.3
+        LoRaWAN Regional Parameters revision: A
+        Join (OTAA / ABP): Device supports OTAA
+        ```
+    - For Irnas sender
+        ```
+        name: irnas
+        server: gpsTracker
+        LoRaWAN MAC version: 1.0.3
+        LoRaWAN Regional Parameters revision: A
+        Codec: Custom JavaScript codec functions
+            For the decode field use the file decoder.js from this folder
+            For the encode field use the file encoder.js from this folder
+        ```
 - Gateways/Create
 ```
 name: gpsTracker
@@ -119,19 +125,42 @@ profile: gpsTracker
 codec:none
 ```
 - Applications/gpsTracker/Devices/Create
-```
-name: gpsSender
-description: gpsSender
-EUI: generate random # write it down as it will be used when setting up the sender
-profile: gpsTracker
-```
-Applications/gpsTracker/Devices/<br/>
-tab: KEYS
-```
-Application key: generate random # write it down as it will be used when setting up the sender
-```
 
-#### SMART connect integration(optional).
+  - Rpi sender
+    ```
+    name: rpi
+    description: rpi
+    EUI: generate random # write it down as it will be used when setting up the Rpi sender
+    profile: rpi
+    Disable frame-counter validation: selected
+    Tags: 
+        type    rpi
+    
+    # The fields belod show only after creating the device.
+    Tab KEYS:
+        Application key: generate random # write it down as it will be used when setting up the sender
+
+    ```
+  - Irnas sender
+    ```
+    name: irnas
+    description: irnas
+    EUI: # Take it from https://console.thethingsnetwork.org/
+    profile: irnas
+    Disable frame-counter validation: selected
+    Tags: 
+        type    irnas
+    
+    # The fields belod show only after creating the device.
+    # Take all these from https://console.thethingsnetwork.org/
+    Device address:
+    Network session key:
+    Application session key:
+    ```
+
+### Setup Chirpstack to send the data to other systems(optional).
+
+#### <b>SMART connect</b>
 
 - Applications/gpsTracker/Integrations/Create
 ```
@@ -145,17 +174,16 @@ headers:
 Uplink data URL: http://lora-gps-server:8070/smartConnect
 ```
 
-#### Traccar integration(optional).
+#### <b>Traccar</b>
 - Applications/gpsSender/Integrations/http
 ```
 headers:
     traccarServer: http://traccar:5055
 Uplink data URL: http://lora-gps-server:8070/traccar
-
-# note multiple uplink urls are separated by coma:
-# http://lora-gps-server:8070/smartConnect,http://lora-gps-server:8070/traccar
-
 ```
+> multiple uplink urls are separated by coma:<br/>
+> http://lora-gps-server:8070/smartConnect, http://lora-gps-server:8070/traccar
+
 
 ## LoraGpsSender setup
  - Env vars
@@ -180,7 +208,7 @@ balena push LoraGpsSender
 
 ## Smart Desktop setup
 
-If you want to create upload the data to SMART desktop need to setup SMART desktop to be connected to SMART connect and also set the content of the data to be uploaded as a header in the chirpstack HTTP integration setup.
+If you want to upload data into SMART desktop it needs to be connected to SMART connect and also set the content of the data to be uploaded as a header in the chirpstack HTTP integration setup.
  - Install the Smart connect plugins.
  - Setup the connection to SMART connect. It requires HTTPS and for this can use the default certificate in https://github.com/arribada/SMARTConnect
  - Create an example Patrol and export it. This will be used as a template.

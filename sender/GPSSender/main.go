@@ -14,8 +14,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/adrianmo/go-nmea"
-	"github.com/arribada/SMARTLoraTracker/receiver/LoraToConnect/alerts"
-	"github.com/arribada/SMARTLoraTracker/sender/GPSSender/pkg/rak811"
+	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device"
+	"github.com/arribada/LoraTracker/sender/GPSSender/pkg/rak811"
 	"github.com/tarm/serial"
 )
 
@@ -24,7 +24,7 @@ func main() {
 
 	debug := os.Getenv("DEBUG") != ""
 	if debug {
-		log.Println("displaying debug logs")
+		log.Println("with debug logs")
 	}
 
 	if f := os.Getenv("SEND_FREQ"); f != "" {
@@ -70,7 +70,7 @@ func main() {
 		Longitude: 23.360378,
 	}
 	if os.Getenv("SEND_FAKE_GPS") != "" {
-		fakeLat, fakeLong, _, err := alerts.Parse(os.Getenv("SEND_FAKE_GPS"))
+		fakeLat, fakeLong, _, err := device.Rpi(os.Getenv("SEND_FAKE_GPS"))
 		if err == nil {
 			fakeGPSdata.Latitude = fakeLat
 			fakeGPSdata.Longitude = fakeLong

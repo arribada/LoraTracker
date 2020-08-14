@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -18,17 +17,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/brocaar/lorawan"
-	"github.com/pkg/errors"
+	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/wkt"
 )
 
 // NewHandler creates a new alert type handler.
-func NewHandler() *Handler {
+func NewHandler(metrics *device.Metrics) *Handler {
 	a := &Handler{
+		metrics: metrics,
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -36,34 +34,6 @@ func NewHandler() *Handler {
 		},
 		allDevIDs: make(map[string]string),
 		careasBuf: make(map[string]struct{}),
-		distanceMeters: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "distance_meters",
-				Help: "Distance in meters between the received gps coordinates and the gaetway location.",
-			},
-			[]string{"gateway_id", "dev_id"},
-		),
-		lastUpdate: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "last_update_seconds",
-				Help: "The time in seconds since the last update.",
-			},
-			[]string{"dev_id"},
-		),
-		rssi: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "rssi",
-				Help: "rssi of the received data.",
-			},
-			[]string{"gateway_id", "dev_id"},
-		),
-		snr: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "snr",
-				Help: "snr of the received data.",
-			},
-			[]string{"gateway_id", "dev_id"},
-		),
 	}
 	a.incLastUpdateTime()
 	return a
@@ -81,12 +51,9 @@ type Handler struct {
 	allDevIDs map[string]string
 	// careasBuf is used to reduce the SMART connect API calls
 	// when checking is CA area exists.
-	careasBuf      map[string]struct{}
-	mtx            sync.Mutex
-	distanceMeters *prometheus.GaugeVec
-	lastUpdate     *prometheus.GaugeVec
-	rssi           *prometheus.GaugeVec
-	snr            *prometheus.GaugeVec
+	careasBuf map[string]struct{}
+	mtx       sync.Mutex
+	metrics   *device.Metrics
 }
 
 // incLastUpdateTime increases the update time to detect when a device has lost a signal.
@@ -98,7 +65,7 @@ func (s *Handler) incLastUpdateTime() {
 			case <-t:
 				s.mtx.Lock()
 				for devID := range s.allDevIDs {
-					s.lastUpdate.With(prometheus.Labels{"dev_id": devID}).Inc()
+					s.metrics.LastUpdate.With(prometheus.Labels{"dev_id": devID}).Inc()
 				}
 				s.mtx.Unlock()
 			}
@@ -107,20 +74,22 @@ func (s *Handler) incLastUpdateTime() {
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c, err := ioutil.ReadAll(r.Body)
+
+	data, err := device.Parse(r, s.metrics)
 	if err != nil {
-		httpError(w, "reading request body err:"+err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if data == nil {
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	if os.Getenv("DEBUG") != "" {
-		log.Printf("incoming request body:%v RemoteAddr:%v headers:%+v \n", string(c), r.RemoteAddr, r.Header)
-	}
+	s.metrics.UpdateSignals(data)
 
-	data := &DataUpPayload{}
-	err = json.Unmarshal(c, data)
-	if err != nil {
-		httpError(w, "unmarshaling request body err:"+err.Error(), http.StatusBadRequest)
+	if !data.Valid && os.Getenv("DEBUG") != "" {
+		log.Printf("skipping data with invalid gps coords, body:%+v", data)
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
@@ -164,7 +133,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !exists {
-			httpError(w, "conservation area doesn't exist", http.StatusNotFound)
+			httpError(w, "conservation area doesn't exist:"+carea[0], http.StatusNotFound)
 			return
 		}
 
@@ -179,7 +148,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "creating an alert err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Println("alert created for application:", data.ApplicationName, ",device id:", genDevID(data))
+	log.Println("alert created for application:", data.Payload.ApplicationName, ",device id:", data.ID)
 
 	fileContent, ok := r.Header["Smartdesktopfile"]
 	if !ok || len(fileContent) != 1 {
@@ -190,62 +159,44 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := s.createPatrolUpload(w, r, []byte(fileContent[0])); err != nil {
 			httpError(w, "creating an upload err:"+err.Error(), http.StatusBadRequest)
 		}
-		log.Println("new upload created", "application:", data.ApplicationName, "device:", genDevID(data))
+		log.Println("new upload created", "application:", data.Payload.ApplicationName, "device:", data.ID)
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *DataUpPayload) error {
+func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *device.Data) error {
 	var err error
-	lat, long, single, err := Parse(string(data.Data))
-	if err != nil {
-		return err
-	}
-
-	devID := genDevID(data)
-
-	if len(data.RXInfo) == 0 {
-		log.Println("received lora data doesn't include gateway meta data")
-	} else {
-		// Distance from each gateway that received this data.
-		for _, gwMeta := range data.RXInfo {
-			s.distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": devID}).Set(distance(lat, long, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K") * 1000)
-			s.rssi.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": devID}).Set(float64(gwMeta.RSSI))
-			s.snr.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": devID}).Set(float64(gwMeta.LoRaSNR))
-			s.lastUpdate.With(prometheus.Labels{"dev_id": devID}).Set(0)
-		}
-	}
 
 	// When the device id is present in all alerts map this guarantees that
 	// the alert type exists so no need to create it.
 	s.mtx.Lock()
-	alertID, ok := s.allDevIDs[devID]
+	alertID, ok := s.allDevIDs[data.ID]
 	s.mtx.Unlock()
 	if !ok {
-		alertID, err = s.alertID(devID)
+		alertID, err = s.alertID(data.ID)
 		if err != nil {
 
-			return fmt.Errorf("getting the alert id by the device devID err:%v", err)
+			return fmt.Errorf("getting the alert id by the device ID:%v err:%v", data.ID, err)
 		}
 		// AlertID with this devID doesn't exists so need to create it.
 		if alertID == "" {
-			log.Println("alert type with the given device label doesn't exist so creating a new one dev id:", devID)
-			alertID, err = s.createAlertType(devID)
+			log.Println("alert type with the given device label doesn't exist so creating a new one dev id:", data.ID)
+			alertID, err = s.createAlertType(data.ID)
 			if err != nil {
-				return fmt.Errorf("creating a new alertType for devID:%v err:%v", devID, err)
+				return fmt.Errorf("creating a new alertType for devID:%v err:%v", data.ID, err)
 			}
 		}
 		s.mtx.Lock()
-		s.allDevIDs[devID] = alertID
+		s.allDevIDs[data.ID] = alertID
 		s.mtx.Unlock()
 	}
 
 	url := s.server + "/server/api/connectalert/"
 	// Use the same alert identifier when want to have a continious line
 	// or use the current time as unique identifier when want to display each alert as an  individual point.
-	if !single {
-		url += genDevID(data)
+	if _, single := data.Metadata["s"]; single {
+		url += data.ID
 	} else {
 		url += strconv.Itoa(int(time.Now().UnixNano()))
 	}
@@ -258,10 +209,10 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 				"type":"Feature",
 				"geometry":	{
 					"type":"Point",
-					"coordinates":["` + strconv.FormatFloat(long, 'f', -1, 64) + `","` + strconv.FormatFloat(lat, 'f', -1, 64) + `"]
+					"coordinates":["` + strconv.FormatFloat(data.Lon, 'f', -1, 64) + `","` + strconv.FormatFloat(data.Lat, 'f', -1, 64) + `"]
 				},
 				"properties":{
-					"deviceId":"` + devID + `",
+					"deviceId":"` + data.ID + `",
 					"id":"0",
 					"latitude":0,
 					"longitude":0,
@@ -269,7 +220,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *Data
 					"accuracy":0,
 					"caUuid":"` + s.ca + `",
 					"level":"1",
-					"description":"` + string(data.Data) + `",
+					"description":"",
 					"typeUuid":"` + alertID + `",
 					"sighting":{}
 					}
@@ -411,8 +362,8 @@ func (s *Handler) careaExists(ca string) (bool, error) {
 	return strings.Contains(string(body), `"uuid":"`+s.ca+`"`), nil
 }
 
-func (s *Handler) createCarea(data *DataUpPayload) error {
-	url := s.server + "/server/api/conservationarea?cauuid=" + s.ca + "&name=" + data.ApplicationName
+func (s *Handler) createCarea(data *device.Data) error {
+	url := s.server + "/server/api/conservationarea?cauuid=" + s.ca + "&name=" + data.Payload.ApplicationName
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return err
@@ -509,113 +460,11 @@ func (s *Handler) createAlertType(label string) (string, error) {
 	return response.UUID, nil
 }
 
-func genDevID(data *DataUpPayload) string {
-	return data.DeviceName + "-" + data.DevEUI.String()
-}
-func Parse(raw string) (float64, float64, bool, error) {
-	coordinates := strings.Split(string(raw), ",")
-	if len(coordinates) < 2 {
-		return 0, 0, false, fmt.Errorf("parsing the cordinates string:%v", raw)
-
-	}
-
-	latitude, err := strconv.ParseFloat(strings.TrimSpace(coordinates[0]), 64)
-	if err != nil {
-		return 0, 0, false, errors.Errorf("parsing the latitude string err:%v", err)
-
-	}
-	if latitude < -90 || latitude > 90 {
-		return 0, 0, false, errors.New("latitude outside acceptable values")
-	}
-	longitude, err := strconv.ParseFloat(strings.TrimSpace(coordinates[1]), 64)
-	if err != nil {
-		return 0, 0, false, errors.Errorf("parsing the longitude string err:%v", err)
-
-	}
-	if longitude < -180 || longitude > 180 {
-		return 0, 0, false, errors.New("longitude outside acceptable values")
-	}
-
-	singlePoints := len(coordinates) == 3 && coordinates[2] == "s"
-
-	return latitude, longitude, singlePoints, nil
-}
-
-// DataUpPayload represents a data-up payload.
-type DataUpPayload struct {
-	ApplicationID   int64             `json:"applicationID,string"`
-	ApplicationName string            `json:"applicationName"`
-	DeviceName      string            `json:"deviceName"`
-	DevEUI          lorawan.EUI64     `json:"devEUI"`
-	RXInfo          []RXInfo          `json:"rxInfo,omitempty"`
-	TXInfo          TXInfo            `json:"txInfo"`
-	ADR             bool              `json:"adr"`
-	FCnt            uint32            `json:"fCnt"`
-	FPort           uint8             `json:"fPort"`
-	Data            []byte            `json:"data"`
-	Object          interface{}       `json:"object,omitempty"`
-	Tags            map[string]string `json:"tags,omitempty"`
-	Variables       map[string]string `json:"-"`
-}
-
-// RXInfo contains the RX information.
-type RXInfo struct {
-	GatewayID lorawan.EUI64 `json:"gatewayID"`
-	Name      string        `json:"name"`
-	Time      *time.Time    `json:"time,omitempty"`
-	RSSI      int           `json:"rssi"`
-	LoRaSNR   float64       `json:"loRaSNR"`
-	Location  *Location     `json:"location"`
-}
-
-// TXInfo contains the TX information.
-type TXInfo struct {
-	Frequency int `json:"frequency"`
-	DR        int `json:"dr"`
-}
-
-// Location details.
-type Location struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Altitude  float64 `json:"altitude"`
-}
-
 // SMARTAlertType details.
 type SMARTAlertType struct {
 	UUID     string `json:"uuid"`
 	TypeUUID string `json:"typeUuid"`
 	Label    string `json:"label"`
-}
-
-func distance(lat1 float64, lng1 float64, lat2 float64, lng2 float64, unit ...string) float64 {
-	const PI float64 = 3.141592653589793
-
-	radlat1 := float64(PI * lat1 / 180)
-	radlat2 := float64(PI * lat2 / 180)
-
-	theta := float64(lng1 - lng2)
-	radtheta := float64(PI * theta / 180)
-
-	dist := math.Sin(radlat1)*math.Sin(radlat2) + math.Cos(radlat1)*math.Cos(radlat2)*math.Cos(radtheta)
-
-	if dist > 1 {
-		dist = 1
-	}
-
-	dist = math.Acos(dist)
-	dist = dist * 180 / PI
-	dist = dist * 60 * 1.1515
-
-	if len(unit) > 0 {
-		if unit[0] == "K" {
-			dist = dist * 1.609344
-		} else if unit[0] == "N" {
-			dist = dist * 0.8684
-		}
-	}
-
-	return dist
 }
 
 func httpError(w http.ResponseWriter, error string, code int) {

@@ -9,8 +9,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/arribada/SMARTLoraTracker/receiver/LoraToGPSServer/smartConnect"
-	"github.com/arribada/SMARTLoraTracker/receiver/LoraToGPSServer/traccar"
+	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device"
+	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/smartConnect"
+	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/traccar"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -32,13 +33,17 @@ func main() {
 		os.Exit(2)
 	}
 
-	smartConnectHandler := smartConnect.NewHandler()
-	traccarHandler := traccar.NewHandler()
+	metrics := device.NewMetrics()
+	smartConnectHandler := smartConnect.NewHandler(metrics)
+	traccarHandler := traccar.NewHandler(metrics)
 
 	log.Println("starting server at port:", *receivePort)
 	if os.Getenv("DEBUG") != "" {
-		log.Println("displaying debug logs")
+		log.Println("with debug logs")
 	}
+
+	// Keep handlers separate so that if one server returns an error
+	// it doesn't affect updates to the others.
 	http.Handle("/smartConnect", smartConnectHandler)
 	http.Handle("/traccar", traccarHandler)
 	http.Handle("/metrics", promhttp.Handler())
