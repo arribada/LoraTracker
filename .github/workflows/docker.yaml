@@ -2,7 +2,9 @@
 jobs:
   push:
     runs-on: ubuntu-latest
-    name: Push Docker image
+    name: Push Docker image for LoraToGPSServer
+    defaults:
+      working-directory: receiver/LoraToGPSServer
     steps:
       - name: Checkout master
         uses: actions/checkout@master
@@ -16,4 +18,3 @@ jobs:
           imageName: arribada/lora-gps-server
           dockerHubUser: '${{ secrets.DOCKER_USER }}'
           dockerHubPassword: '${{ secrets.DOCKER_PASS }}'
-          dockerFile: receiver/LoraToGPSServer/Dockerfile

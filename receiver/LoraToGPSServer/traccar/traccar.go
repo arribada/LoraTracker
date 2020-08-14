@@ -40,7 +40,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !data.Valid {
-		os.Getenv("DEBUG") == "1"
+		if os.Getenv("DEBUG") == "1" {
 			log.Printf("skipping data with invalid gps coords, body:%+v", data)
 		}
 		w.WriteHeader(http.StatusOK)
