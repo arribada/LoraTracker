@@ -80,12 +80,13 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if data == nil {
+	if !data.Valid {
+		os.Getenv("DEBUG") == "1"
+			log.Printf("skipping data with invalid gps coords, body:%+v", data)
+		}
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-
-	s.metrics.UpdateSignals(data)
 
 	if !data.Valid && os.Getenv("DEBUG") == "1" {
 		log.Printf("skipping data with invalid gps coords, body:%+v", data)
