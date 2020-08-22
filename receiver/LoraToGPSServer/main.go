@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	log.SetFlags(log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ltime | log.Lshortfile | log.Lmsgprefix)
 	app := kingpin.New(filepath.Base(os.Args[0]), "A tool that listens for lora packets and send them to a remote SMART connect server")
 	app.HelpFlag.Short('h')
 

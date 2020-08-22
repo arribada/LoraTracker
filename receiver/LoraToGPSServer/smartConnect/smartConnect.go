@@ -74,12 +74,13 @@ func (s *Handler) incLastUpdateTime() {
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 	data, err := device.Parse(r, s.metrics)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	log.SetPrefix("devName:" + data.Payload.DeviceName)
+
 	if !data.Valid {
 		if os.Getenv("DEBUG") == "1" {
 			log.Printf("skipping data with invalid gps coords, body:%+v", data)
@@ -159,7 +160,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := s.createPatrolUpload(w, r, []byte(fileContent[0])); err != nil {
 			httpError(w, "creating an upload err:"+err.Error(), http.StatusBadRequest)
 		}
-		log.Println("new upload created", "application:", data.Payload.ApplicationName, "device:", data.ID)
+		log.Println("new upload created")
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -243,7 +244,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *devi
 	if res.StatusCode/100 != 2 {
 		return fmt.Errorf("unexpected response status code:%v", res.StatusCode)
 	}
-	log.Println("alert created for application:", data.Payload.ApplicationName, ",device id:", data.ID, ", request:", req.URL.RawQuery)
+	log.Println("alert created , request:", req.URL.RawQuery)
 
 	response := &SMARTAlertType{}
 	body, err := ioutil.ReadAll(res.Body)

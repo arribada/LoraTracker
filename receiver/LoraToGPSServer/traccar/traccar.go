@@ -39,6 +39,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	log.SetPrefix("devName:" + data.Payload.DeviceName)
 
 	if !data.Valid {
 		if os.Getenv("DEBUG") == "1" {
@@ -97,7 +98,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Println("gps point created for application:", data.Payload.ApplicationName, ",device id:", data.ID, ", request:", req.URL.RawQuery)
+	log.Println("gps point created, request:", req.URL.RawQuery)
 	w.WriteHeader(http.StatusOK)
 }
 

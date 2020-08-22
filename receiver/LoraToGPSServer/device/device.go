@@ -151,15 +151,15 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 		return nil, errors.New("data object doesn't contain lon")
 	}
 
-	// When resent is more than one it means NO new gps coordinates are available and
+	// When resent is more than 1 it means NO new gps coordinates are available and
 	// the latest ones were resent so can be ignored.
-	if _, ok := data.Object["gps_resend"]; !ok {
+	if val, ok := data.Object["gps_resend"]; !ok || val.(int) == 1 {
 		dataParsed.Valid = true
 	}
 
 	dataParsed.Lat = lat.(float64)
 	dataParsed.Lon = lon.(float64)
-	if dataParsed.Lat != 0 && dataParsed.Lon != 0 {
+	if dataParsed.Lat != 0.0 && dataParsed.Lon != 0.0 {
 		dataParsed.Valid = true
 	}
 
