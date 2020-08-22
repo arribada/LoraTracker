@@ -149,7 +149,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "creating an alert err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Println("alert created for application:", data.Payload.ApplicationName, ",device id:", data.ID)
+	log.Println("alert created for application:", data.Payload.ApplicationName, ",device id:", data.ID, ", request:", req.URL.RawQuery)
 
 	fileContent, ok := r.Header["Smartdesktopfile"]
 	if !ok || len(fileContent) != 1 {
