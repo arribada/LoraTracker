@@ -86,9 +86,8 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-
 	log.Println("gps point created for application:", data.Payload.ApplicationName, ",device id:", data.ID, ", request:", req.URL.RawQuery)
+	w.WriteHeader(http.StatusOK)
 }
 
 func httpError(w http.ResponseWriter, err string, code int) {
