@@ -149,7 +149,6 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "creating an alert err:"+err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Println("alert created for application:", data.Payload.ApplicationName, ",device id:", data.ID, ", request:", req.URL.RawQuery)
 
 	fileContent, ok := r.Header["Smartdesktopfile"]
 	if !ok || len(fileContent) != 1 {
@@ -244,6 +243,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *devi
 	if res.StatusCode/100 != 2 {
 		return fmt.Errorf("unexpected response status code:%v", res.StatusCode)
 	}
+	log.Println("alert created for application:", data.Payload.ApplicationName, ",device id:", data.ID, ", request:", req.URL.RawQuery)
 
 	response := &SMARTAlertType{}
 	body, err := ioutil.ReadAll(res.Body)

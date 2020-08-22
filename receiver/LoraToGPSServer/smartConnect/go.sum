@@ -14,8 +14,6 @@ github.com/arribada/LoraTracker v0.0.0-20200727100430-2cfdcceb0e08 h1:7cs8C2uHY4
 github.com/arribada/LoraTracker v0.0.0-20200814183046-251ded8a9175 h1:mDfqCEmN4vrrjRV0pzi0DH1RC12WmmUhEo0d3amBzYY=
 github.com/arribada/LoraTracker/receiver/LoraToGPSServer v0.0.0-20200727100430-2cfdcceb0e08 h1:Zfm3mgWoyC+bDXPnQE45hDJMvIpCGlGNiUSDRjEAdtc=
 github.com/arribada/LoraTracker/receiver/LoraToGPSServer v0.0.0-20200814183046-251ded8a9175 h1:0SbbN8Vczw6p86vpgRNeQU0iCDZ4OK7ubSiflqVkOBc=
-github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device v0.0.0-20200814180814-8cfe5cee5bb2 h1:5nIG+ovRyVgKC3hCgbhCJ6xxLSDN0DyTUrp39JziWd4=
-github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device v0.0.0-20200814180814-8cfe5cee5bb2/go.mod h1:XzMaPvcxIkeFQAcgvFwGNcNFrjUSd9UK0Bl/QabkU3w=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
