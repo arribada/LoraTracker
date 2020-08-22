@@ -3,6 +3,7 @@ package traccar
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -69,7 +70,9 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q.Add("id", data.Payload.DevEUI.String())
 	q.Add("lat", fmt.Sprintf("%g", data.Lat))
 	q.Add("lon", fmt.Sprintf("%g", data.Lon))
-	q.Add("battery", fmt.Sprintf("%g", data.Bat))
+	if data.Bat != 0 {
+		q.Add("battery", fmt.Sprintf("%g", data.Bat))
+	}
 	q.Add("snr", fmt.Sprintf("%g", data.Snr))
 	q.Add("rssi", strconv.Itoa(data.Rssi))
 	req.URL.RawQuery = q.Encode()
@@ -84,6 +87,14 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if res.StatusCode/100 != 2 {
 		httpError(w, "unexpected response status code:"+strconv.Itoa(res.StatusCode)+" request:"+req.URL.RawQuery, http.StatusBadRequest)
 		return
+	}
+	if os.Getenv("DEBUG") == "1" {
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			log.Printf("reading response body err:%v", err)
+		} else {
+			log.Printf("reply status:%v, body:%v", res.StatusCode, string(body))
+		}
 	}
 
 	log.Println("gps point created for application:", data.Payload.ApplicationName, ",device id:", data.ID, ", request:", req.URL.RawQuery)
