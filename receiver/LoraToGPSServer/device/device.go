@@ -19,16 +19,15 @@ import (
 )
 
 type Data struct {
-	Bat      float64
-	Lat      float64
-	Lon      float64
-	Snr      float64
-	Rssi     int
-	Payload  *DataUpPayload
-	Metadata map[string]string
-	Type     string
-	ID       string
-	Valid    bool
+	Lat     float64
+	Lon     float64
+	Snr     float64
+	Rssi    int
+	Payload *DataUpPayload
+	Attr    map[string]string
+	Type    string
+	ID      string
+	Valid   bool
 }
 
 func Parse(r *http.Request, metrics *Metrics) (*Data, error) {
@@ -117,25 +116,29 @@ func Rpi(data string) (*Data, error) {
 	}
 
 	d := &Data{
-		Lat:      lat,
-		Lon:      lon,
-		Metadata: map[string]string{},
-		Valid:    true,
+		Lat:   lat,
+		Lon:   lon,
+		Attr:  map[string]string{},
+		Valid: true,
 	}
 
 	singlePoints := len(coordinates) == 3 && coordinates[2] == "s"
 	if singlePoints {
-		d.Metadata["s"] = "true"
+		d.Attr["s"] = "true"
 	}
 
 	return d, nil
 }
 
 func Irnas(data *DataUpPayload) (*Data, error) {
-	dataParsed := &Data{}
+	dataParsed := &Data{
+		Valid: true,
+		Attr:  map[string]string{},
+	}
 
 	// Non GPS data.
 	if data.FPort != 1 && data.FPort != 12 {
+		dataParsed.Valid = false
 		if os.Getenv("DEBUG") == "1" {
 			log.Printf("skipping non gps data, fport:%+v", data.FPort)
 		}
@@ -153,18 +156,18 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 
 	// When resent is more than 1 it means NO new gps coordinates are available and
 	// the latest ones were resent so can be ignored.
-	if val, ok := data.Object["gps_resend"]; !ok || val.(int) == 1 {
-		dataParsed.Valid = true
+	if val, ok := data.Object["gps_resend"]; ok && val.(float64) != 1.0 {
+		dataParsed.Valid = false
 	}
 
 	dataParsed.Lat = lat.(float64)
 	dataParsed.Lon = lon.(float64)
-	if dataParsed.Lat != 0.0 && dataParsed.Lon != 0.0 {
-		dataParsed.Valid = true
+	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
+		dataParsed.Valid = false
 	}
 
-	if bat, ok := data.Object["battery"]; ok {
-		dataParsed.Bat = bat.(float64)
+	if val, ok := data.Object["battery"]; ok {
+		dataParsed.Attr["battery"] = fmt.Sprintf("%v", val.(float64))
 	}
 
 	return dataParsed, nil

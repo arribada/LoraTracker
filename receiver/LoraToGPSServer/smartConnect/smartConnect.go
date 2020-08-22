@@ -79,7 +79,8 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.SetPrefix("devName:" + data.Payload.DeviceName)
+	log.SetPrefix("devName:" + data.Payload.DeviceName + ", msg:")
+	defer log.SetPrefix("")
 
 	if !data.Valid {
 		if os.Getenv("DEBUG") == "1" {
@@ -196,7 +197,7 @@ func (s *Handler) createAlert(w http.ResponseWriter, r *http.Request, data *devi
 	url := s.server + "/server/api/connectalert/"
 	// Use the same alert identifier when want to have a continious line
 	// or use the current time as unique identifier when want to display each alert as an  individual point.
-	if _, single := data.Metadata["s"]; single {
+	if _, single := data.Attr["s"]; single {
 		url += data.ID
 	} else {
 		url += strconv.Itoa(int(time.Now().UnixNano()))

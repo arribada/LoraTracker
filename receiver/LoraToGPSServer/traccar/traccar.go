@@ -39,11 +39,12 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.SetPrefix("devName:" + data.Payload.DeviceName)
+	log.SetPrefix("devName:" + data.Payload.DeviceName + ", msg:")
+	defer log.SetPrefix("")
 
 	if !data.Valid {
 		if os.Getenv("DEBUG") == "1" {
-			log.Printf("skipping data with invalid gps coords, body:%+v", data)
+			log.Printf("skipping data with invalid or stale gps coords, body:%+v", data)
 		}
 		w.WriteHeader(http.StatusOK)
 		return
@@ -71,11 +72,12 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q.Add("id", data.Payload.DevEUI.String())
 	q.Add("lat", fmt.Sprintf("%g", data.Lat))
 	q.Add("lon", fmt.Sprintf("%g", data.Lon))
-	if data.Bat != 0 {
-		q.Add("battery", fmt.Sprintf("%g", data.Bat))
-	}
 	q.Add("snr", fmt.Sprintf("%g", data.Snr))
 	q.Add("rssi", strconv.Itoa(data.Rssi))
+	for n, v := range data.Attr {
+		q.Add(n, fmt.Sprintf("%v", v))
+
+	}
 	req.URL.RawQuery = q.Encode()
 
 	res, err := s.httpClient.Do(req)
