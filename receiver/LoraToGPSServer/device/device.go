@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/brocaar/lorawan"
@@ -28,6 +29,8 @@ type Data struct {
 	Type    string
 	ID      string
 	Valid   bool
+	Speed   float64
+	Time    int64 // The gps fix time in epoch timestamp.
 }
 
 func Parse(r *http.Request, metrics *Metrics) (*Data, error) {
@@ -69,7 +72,10 @@ func Parse(r *http.Request, metrics *Metrics) (*Data, error) {
 	dataParsed.Type = devType
 	dataParsed.ID = GenID(data)
 
-	metrics.UpdateSignals(dataParsed)
+	if err := metrics.Update(dataParsed); err != nil {
+		return nil, err
+	}
+	dataParsed.Speed = metrics.Speed()
 
 	if len(data.RXInfo) == 0 {
 		if os.Getenv("DEBUG") == "1" {
@@ -120,6 +126,7 @@ func Rpi(data string) (*Data, error) {
 		Lon:   lon,
 		Attr:  map[string]string{},
 		Valid: true,
+		Time:  time.Now().Unix(),
 	}
 
 	singlePoints := len(coordinates) == 3 && coordinates[2] == "s"
@@ -164,6 +171,9 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 	dataParsed.Lon = lon.(float64)
 	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
 		dataParsed.Valid = false
+	}
+	if val, ok := data.Object["gps_time"]; ok {
+		dataParsed.Time = val.(int64)
 	}
 
 	if val, ok := data.Object["battery"]; ok {
@@ -214,39 +224,47 @@ type Location struct {
 }
 
 func NewMetrics() *Metrics {
-	return &Metrics{
-		DistanceMeters: promauto.NewGaugeVec(
+	m := &Metrics{
+		distanceMeters: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "distance_meters",
 				Help: "Distance in meters between the received gps coordinates and the gaetway location.",
 			},
 			[]string{"gateway_id", "dev_id"},
 		),
-		LastUpdate: promauto.NewGaugeVec(
+		lastUpdate: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "last_update_seconds",
 				Help: "The time in seconds since the last update.",
 			},
 			[]string{"dev_id"},
 		),
-		Rssi: promauto.NewGaugeVec(
+		rssi: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "rssi",
 				Help: "rssi of the received data.",
 			},
 			[]string{"gateway_id", "dev_id"},
 		),
-		Snr: promauto.NewGaugeVec(
+		snr: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "snr",
 				Help: "snr of the received data.",
 			},
 			[]string{"gateway_id", "dev_id"},
 		),
+		allDevIDs: make(map[string]struct{}),
 	}
+
+	m.incLastUpdateTime()
+
+	return m
 }
 
-func (s *Metrics) UpdateSignals(data *Data) {
+func (s *Metrics) Update(data *Data) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
 	if len(data.Payload.RXInfo) == 0 {
 		if os.Getenv("DEBUG") == "1" {
 			log.Println("received lora data doesn't include gateway meta data")
@@ -254,28 +272,71 @@ func (s *Metrics) UpdateSignals(data *Data) {
 	} else {
 		// Distance from each gateway that received this data.
 		for _, gwMeta := range data.Payload.RXInfo {
-			s.DistanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(distance(data.Lat, data.Lon, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K") * 1000)
-			s.Rssi.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.RSSI))
-			s.Snr.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.LoRaSNR))
-			s.LastUpdate.With(prometheus.Labels{"dev_id": data.ID}).Set(0)
+			dist, err := Distance(data.Lat, data.Lon, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K")
+			if err != nil {
+				return err
+			}
+			s.distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(dist * 1000)
+			s.rssi.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.RSSI))
+			s.snr.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.LoRaSNR))
+			s.lastUpdate.With(prometheus.Labels{"dev_id": data.ID}).Set(0)
 		}
 	}
+
+	s.allDevIDs[data.ID] = struct{}{}
+
+	if s.lastUpdateData != nil {
+		speed, err := Speed(s.lastUpdateData, data)
+		if err != nil {
+			return err
+		}
+		s.speed = speed
+	}
+	s.lastUpdateData = data
+	return nil
+}
+
+// incLastUpdateTime increases the update time to detect when a device has lost a signal.
+func (s *Metrics) incLastUpdateTime() {
+	go func() {
+		t := time.NewTicker(time.Second).C
+		for range t {
+			s.mtx.Lock()
+			for devID := range s.allDevIDs {
+				s.lastUpdate.With(prometheus.Labels{"dev_id": devID}).Inc()
+			}
+			s.mtx.Unlock()
+		}
+	}()
+}
+
+func (s *Metrics) Speed() float64 {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	return s.speed
 }
 
 type Metrics struct {
-	DistanceMeters *prometheus.GaugeVec
-	LastUpdate     *prometheus.GaugeVec
-	Rssi           *prometheus.GaugeVec
-	Snr            *prometheus.GaugeVec
+	distanceMeters *prometheus.GaugeVec
+	lastUpdate     *prometheus.GaugeVec
+	rssi           *prometheus.GaugeVec
+	snr            *prometheus.GaugeVec
+	lastUpdateData *Data
+	speed          float64
+
+	mtx sync.Mutex
+
+	// allDevIDs is used to track the last update metric.
+	allDevIDs map[string]struct{}
 }
 
-func distance(lat1 float64, lng1 float64, lat2 float64, lng2 float64, unit ...string) float64 {
+func Distance(lat1 float64, lon1 float64, lat2 float64, lon2 float64, unit ...string) (float64, error) {
 	const PI float64 = 3.141592653589793
 
 	radlat1 := float64(PI * lat1 / 180)
 	radlat2 := float64(PI * lat2 / 180)
 
-	theta := float64(lng1 - lng2)
+	theta := float64(lon1 - lon2)
 	radtheta := float64(PI * theta / 180)
 
 	dist := math.Sin(radlat1)*math.Sin(radlat2) + math.Cos(radlat1)*math.Cos(radlat2)*math.Cos(radtheta)
@@ -290,13 +351,25 @@ func distance(lat1 float64, lng1 float64, lat2 float64, lng2 float64, unit ...st
 
 	if len(unit) > 0 {
 		if unit[0] == "K" {
-			dist = dist * 1.609344
+			return dist * 1.609344, nil
 		} else if unit[0] == "N" {
-			dist = dist * 0.8684
+			return dist * 0.8684, nil
 		}
 	}
 
-	return dist
+	return 0, fmt.Errorf("invalid metric unit:%v", unit)
+}
+
+func Speed(point1 *Data, point2 *Data) (float64, error) {
+	km, err := Distance(point1.Lat, point1.Lon, point2.Lat, point2.Lon, "K")
+	if err != nil {
+		return 0, err
+	}
+	if km == 0.0 {
+		return 0.0, nil
+	}
+	hr := float64(point2.Time-point1.Time) / 3600
+	return km / hr, nil
 }
 
 func GenID(data *DataUpPayload) string {

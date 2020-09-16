@@ -39,6 +39,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	log.SetPrefix("devName:" + data.Payload.DeviceName + ", msg:")
 	defer log.SetPrefix("")
 
@@ -74,6 +75,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q.Add("lon", fmt.Sprintf("%g", data.Lon))
 	q.Add("snr", fmt.Sprintf("%g", data.Snr))
 	q.Add("rssi", strconv.Itoa(data.Rssi))
+	q.Add("speed", fmt.Sprintf("%f", data.Speed))
 	for n, v := range data.Attr {
 		q.Add(n, fmt.Sprintf("%v", v))
 

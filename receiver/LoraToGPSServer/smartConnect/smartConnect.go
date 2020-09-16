@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/encoding/wkt"
 )
@@ -35,7 +34,6 @@ func NewHandler(metrics *device.Metrics) *Handler {
 		allDevIDs: make(map[string]string),
 		careasBuf: make(map[string]struct{}),
 	}
-	a.incLastUpdateTime()
 	return a
 }
 
@@ -54,23 +52,6 @@ type Handler struct {
 	careasBuf map[string]struct{}
 	mtx       sync.Mutex
 	metrics   *device.Metrics
-}
-
-// incLastUpdateTime increases the update time to detect when a device has lost a signal.
-func (s *Handler) incLastUpdateTime() {
-	go func() {
-		t := time.NewTicker(time.Second).C
-		for {
-			select {
-			case <-t:
-				s.mtx.Lock()
-				for devID := range s.allDevIDs {
-					s.metrics.LastUpdate.With(prometheus.Labels{"dev_id": devID}).Inc()
-				}
-				s.mtx.Unlock()
-			}
-		}
-	}()
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
