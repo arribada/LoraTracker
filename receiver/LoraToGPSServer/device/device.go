@@ -173,7 +173,7 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 		dataParsed.Valid = false
 	}
 	if val, ok := data.Object["gps_time"]; ok {
-		dataParsed.Time = val.(int64)
+		dataParsed.Time = int64(val.(float64))
 	}
 
 	if val, ok := data.Object["battery"]; ok {
