@@ -51,6 +51,17 @@ function Encode(fPort, obj) {
         bytes[23] = ((obj.system_charge_max - 2500) / 10) & 0xFF;
         bytes[24] = (obj.system_input_charge_min) & 0xFF;
         bytes[25] = (obj.system_input_charge_min) >> 8 & 0xFF;
+        bytes[26] = (obj.pulse_threshold) & 0xFF;
+        bytes[27] = (obj.pulse_on_timeout) & 0xFF
+
+        bytes[28] = (obj.pulse_min_interval) & 0xFF;
+        bytes[29] = (obj.pulse_min_interval) >> 8 & 0xFF;
+
+        bytes[30] = (obj.gps_accel_z_threshold + 2000) & 0xFF;
+        bytes[31] = (obj.gps_accel_z_threshold + 2000) >> 8 & 0xFF;
+
+        bytes[32] = 0;
+        bytes[33] = 0;
     }
     else if (fPort === 30) {
         bytes[0] = (obj.freq_start) & 0xFF;
