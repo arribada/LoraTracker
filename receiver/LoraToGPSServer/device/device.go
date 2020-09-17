@@ -386,6 +386,7 @@ func Speed(point1 *Data, point2 *Data) (float64, error) {
 	kmh := km / hr
 	knots := kmh / 1.8520001412492
 
+	fmt.Println(timeDiff, hr, kmh, knots)
 	return knots, nil
 }
 
