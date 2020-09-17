@@ -172,7 +172,10 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
 		dataParsed.Valid = false
 	}
-	if val, ok := data.Object["gps_time"]; ok {
+	if val, ok := data.Object["gps_time"]; ok { // From system updates.
+		dataParsed.Time = int64(val.(float64))
+	}
+	if val, ok := data.Object["time"]; ok { // From periodic or motion triggered updates.
 		dataParsed.Time = int64(val.(float64))
 	}
 
@@ -364,6 +367,7 @@ func Distance(lat1 float64, lon1 float64, lat2 float64, lon2 float64, unit ...st
 	return 0, fmt.Errorf("invalid metric unit:%v", unit)
 }
 
+// Speed calculates speed in knots from the distance between 2 gps points.
 func Speed(point1 *Data, point2 *Data) (float64, error) {
 	km, err := Distance(point1.Lat, point1.Lon, point2.Lat, point2.Lon, "K")
 	if err != nil {
@@ -372,8 +376,16 @@ func Speed(point1 *Data, point2 *Data) (float64, error) {
 	if km == 0.0 {
 		return 0.0, nil
 	}
-	hr := float64(point2.Time-point1.Time) / 3600
-	return km / hr, nil
+
+	// Use Abs in case of an out of order updates.
+	// For the distance calculation it doesn't matter,
+	// but for the time diff we don't want negative numbers.
+	timeDiff := math.Abs(float64(point2.Time - point1.Time))
+
+	hr := timeDiff / 3600.0
+	kmh := km / hr
+	knots := kmh / 1.8520001412492
+	return knots, nil
 }
 
 func GenID(data *DataUpPayload) string {
