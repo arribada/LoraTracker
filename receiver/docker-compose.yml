@@ -88,6 +88,11 @@ services:
             <entry key='database.user'>sa</entry>
             <entry key='database.password'></entry>
             <entry key='logger.file'>/dev/stdout</entry>
+            <entry key='logger.level'>info</entry>
+            <entry key='report.trip.minimalNoDataDuration'>1</entry>
+            <entry key='report.trip.minimalTripDuration'>1</entry>
+            <entry key='report.trip.minimalTripDistance'>1</entry>
+            <entry key='report.trip.minimalParkingDuration'>1</entry>
         </properties>
   smart-postgres:
     image: arribada/smart-connect-postgis@sha256:96787a45e1146ac3cd88cad15aa89243d74738e574e6b9730a07415616e3e521
