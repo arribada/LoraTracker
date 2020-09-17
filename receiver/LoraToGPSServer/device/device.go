@@ -290,7 +290,7 @@ func (s *Metrics) Update(data *Data) error {
 
 	s.allDevIDs[data.ID] = struct{}{}
 
-	if s.lastUpdateData != nil {
+	if s.lastUpdateData != nil && data.Valid {
 		speed, err := Speed(s.lastUpdateData, data)
 		if err != nil {
 			return err
@@ -386,7 +386,6 @@ func Speed(point1 *Data, point2 *Data) (float64, error) {
 	kmh := km / hr
 	knots := kmh / 1.8520001412492
 
-	fmt.Println(timeDiff, hr, kmh, knots)
 	return knots, nil
 }
 
