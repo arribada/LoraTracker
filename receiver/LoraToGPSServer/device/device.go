@@ -272,11 +272,13 @@ func (s *Metrics) Update(data *Data) error {
 	} else {
 		// Distance from each gateway that received this data.
 		for _, gwMeta := range data.Payload.RXInfo {
-			dist, err := Distance(data.Lat, data.Lon, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K")
-			if err != nil {
-				return err
+			if data.Valid {
+				dist, err := Distance(data.Lat, data.Lon, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K")
+				if err != nil {
+					return err
+				}
+				s.distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(dist * 1000)
 			}
-			s.distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(dist * 1000)
 			s.rssi.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.RSSI))
 			s.snr.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.LoRaSNR))
 			s.lastUpdate.With(prometheus.Labels{"dev_id": data.ID}).Set(0)
@@ -292,7 +294,9 @@ func (s *Metrics) Update(data *Data) error {
 		}
 		s.speed = speed
 	}
-	s.lastUpdateData = data
+	if data.Valid {
+		s.lastUpdateData = data
+	}
 	return nil
 }
 
