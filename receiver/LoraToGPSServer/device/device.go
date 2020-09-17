@@ -33,7 +33,26 @@ type Data struct {
 	Time    int64 // The gps fix time in epoch timestamp.
 }
 
-func Parse(r *http.Request, metrics *Metrics) (*Data, error) {
+func NewManager() *Manager {
+	mn := &Manager{
+		metrics:   NewMetrics(),
+		allDevIDs: make(map[string]*Data),
+	}
+	mn.incLastUpdateTime()
+	return mn
+}
+
+type Manager struct {
+	lastFCnt uint32
+	metrics  *Metrics
+
+	mtx sync.Mutex
+
+	// allDevIDs holds the last data update for all devices.
+	allDevIDs map[string]*Data
+}
+
+func (self *Manager) Parse(r *http.Request) (*Data, error) {
 	c, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "reading request body")
@@ -72,10 +91,17 @@ func Parse(r *http.Request, metrics *Metrics) (*Data, error) {
 	dataParsed.Type = devType
 	dataParsed.ID = GenID(data)
 
-	if err := metrics.Update(dataParsed); err != nil {
-		return nil, err
+	// Update the metrics only for non duplicate requests.
+	// A duplicate request happens because the lora server is set to send
+	// the same request for each backend server - traccar, smart connect etc.
+	if self.lastFCnt != data.FCnt {
+		if err := self.update(dataParsed); err != nil {
+			return nil, err
+		}
 	}
-	dataParsed.Speed = metrics.Speed()
+	self.lastFCnt = data.FCnt
+
+	dataParsed.Speed = self.Speed(dataParsed.ID)
 
 	if len(data.RXInfo) == 0 {
 		if os.Getenv("DEBUG") == "1" {
@@ -96,6 +122,62 @@ func Parse(r *http.Request, metrics *Metrics) (*Data, error) {
 
 	return dataParsed, err
 
+}
+
+func (self *Manager) update(data *Data) error {
+	self.mtx.Lock()
+	defer self.mtx.Unlock()
+
+	if len(data.Payload.RXInfo) == 0 {
+		if os.Getenv("DEBUG") == "1" {
+			log.Println("received lora data doesn't include gateway meta data")
+		}
+	} else {
+		// Distance from each gateway that received this data.
+		for _, gwMeta := range data.Payload.RXInfo {
+			if data.Valid {
+				dist, err := Distance(data.Lat, data.Lon, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K")
+				if err != nil {
+					return err
+				}
+				self.metrics.distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(dist * 1000)
+			}
+			self.metrics.rssi.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.RSSI))
+			self.metrics.snr.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.LoRaSNR))
+			self.metrics.lastUpdate.With(prometheus.Labels{"dev_id": data.ID}).Set(0)
+		}
+	}
+
+	if lastUpdate, ok := self.allDevIDs[data.ID]; ok && lastUpdate.Valid && data.Valid {
+		speed, err := Speed(lastUpdate, data)
+		if err != nil {
+			return err
+		}
+		data.Speed = speed
+	}
+	self.allDevIDs[data.ID] = data
+
+	return nil
+}
+
+func (s *Manager) Speed(devID string) float64 {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	return s.allDevIDs[devID].Speed
+}
+
+// incLastUpdateTime increases the update time to detect when a device has lost a signal.
+func (s *Manager) incLastUpdateTime() {
+	go func() {
+		t := time.NewTicker(time.Second).C
+		for range t {
+			s.mtx.Lock()
+			for devID := range s.allDevIDs {
+				s.metrics.lastUpdate.With(prometheus.Labels{"dev_id": devID}).Inc()
+			}
+			s.mtx.Unlock()
+		}
+	}()
 }
 
 func Rpi(data string) (*Data, error) {
@@ -256,71 +338,8 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"gateway_id", "dev_id"},
 		),
-		allDevIDs: make(map[string]struct{}),
 	}
-
-	m.incLastUpdateTime()
-
 	return m
-}
-
-func (s *Metrics) Update(data *Data) error {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	if len(data.Payload.RXInfo) == 0 {
-		if os.Getenv("DEBUG") == "1" {
-			log.Println("received lora data doesn't include gateway meta data")
-		}
-	} else {
-		// Distance from each gateway that received this data.
-		for _, gwMeta := range data.Payload.RXInfo {
-			if data.Valid {
-				dist, err := Distance(data.Lat, data.Lon, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K")
-				if err != nil {
-					return err
-				}
-				s.distanceMeters.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(dist * 1000)
-			}
-			s.rssi.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.RSSI))
-			s.snr.With(prometheus.Labels{"gateway_id": gwMeta.GatewayID.String(), "dev_id": data.ID}).Set(float64(gwMeta.LoRaSNR))
-			s.lastUpdate.With(prometheus.Labels{"dev_id": data.ID}).Set(0)
-		}
-	}
-
-	s.allDevIDs[data.ID] = struct{}{}
-
-	if s.lastUpdateData != nil && data.Valid {
-		speed, err := Speed(s.lastUpdateData, data)
-		if err != nil {
-			return err
-		}
-		s.speed = speed
-	}
-	if data.Valid {
-		s.lastUpdateData = data
-	}
-	return nil
-}
-
-// incLastUpdateTime increases the update time to detect when a device has lost a signal.
-func (s *Metrics) incLastUpdateTime() {
-	go func() {
-		t := time.NewTicker(time.Second).C
-		for range t {
-			s.mtx.Lock()
-			for devID := range s.allDevIDs {
-				s.lastUpdate.With(prometheus.Labels{"dev_id": devID}).Inc()
-			}
-			s.mtx.Unlock()
-		}
-	}()
-}
-
-func (s *Metrics) Speed() float64 {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	return s.speed
 }
 
 type Metrics struct {
@@ -328,13 +347,6 @@ type Metrics struct {
 	lastUpdate     *prometheus.GaugeVec
 	rssi           *prometheus.GaugeVec
 	snr            *prometheus.GaugeVec
-	lastUpdateData *Data
-	speed          float64
-
-	mtx sync.Mutex
-
-	// allDevIDs is used to track the last update metric.
-	allDevIDs map[string]struct{}
 }
 
 func Distance(lat1 float64, lon1 float64, lat2 float64, lon2 float64, unit ...string) (float64, error) {
@@ -386,7 +398,6 @@ func Speed(point1 *Data, point2 *Data) (float64, error) {
 	kmh := km / hr
 	knots := kmh / 1.8520001412492
 
-	fmt.Println(timeDiff, hr, kmh, knots)
 	return knots, nil
 }
 

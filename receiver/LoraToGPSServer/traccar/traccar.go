@@ -15,9 +15,9 @@ import (
 )
 
 // NewHandler creates a new alert type handler.
-func NewHandler(metrics *device.Metrics) *Handler {
+func NewHandler(m *device.Manager) *Handler {
 	a := &Handler{
-		metrics: metrics,
+		devManager: m,
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -30,11 +30,11 @@ func NewHandler(metrics *device.Metrics) *Handler {
 // Handler is the alert type handler struct.
 type Handler struct {
 	httpClient *http.Client
-	metrics    *device.Metrics
+	devManager *device.Manager
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	data, err := device.Parse(r, s.metrics)
+	data, err := s.devManager.Parse(r)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return

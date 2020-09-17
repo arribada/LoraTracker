@@ -33,9 +33,9 @@ func main() {
 		os.Exit(2)
 	}
 
-	metrics := device.NewMetrics()
-	smartConnectHandler := smartConnect.NewHandler(metrics)
-	traccarHandler := traccar.NewHandler(metrics)
+	manager := device.NewManager()
+	smartConnectHandler := smartConnect.NewHandler(manager)
+	traccarHandler := traccar.NewHandler(manager)
 
 	log.Println("starting server at port:", *receivePort)
 	if os.Getenv("DEBUG") == "1" {
