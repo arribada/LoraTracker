@@ -29,6 +29,9 @@ Create an application for the sender and the receiver: `LoraGpsSender`, `LoraGps
 
 ## LoraGpsReciever Setup
 
+Chirpstack server can run directly on the Rpi(Lora hat) or on a Lorix Gateway.
+ - For chirsptack on Lorix install using https://www.chirpstack.io/gateway-os/install/wifx/ and comment out all chirpstack containers in the compose file.
+
 - Fleet configuration
 ```
 RESIN_HOST_CONFIG_enable_uart
@@ -40,11 +43,13 @@ RESIN_HOST_CONFIG_gpu_mem 16mb
 
  - Env vars
 ```
+PAGERDUTY_ROUTING_KEY=... # The "Integration Key" from Pager Duty for sending  alerts with the alert manager.
+SLACK_API_URL=... # The "Webhook URL" from the Slack Webhooks App.
+
+# Skip vars below if not using the Rpi as chirpstack server.
 APPLICATION__SERVER_EXTERNAL__API_JWT__SECRET=....
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=...
-PAGERDUTY_ROUTING_KEY=... # The "Integration Key" from Pager Duty for sending  alerts with the alert manager.
-SLACK_API_URL=... # The "Webhook URL" from the Slack Webhooks App.
 CONCENTRATOR_CONFIG= // The semtech gateway setting. See https://github.com/arribada/packet-forwarder
 NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The default is EU_863_870. For all possible options see https://www.chirpstack.io/network-server
 ```
