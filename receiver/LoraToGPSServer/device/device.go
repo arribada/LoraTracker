@@ -31,6 +31,7 @@ type Data struct {
 	Valid   bool
 	Speed   float64
 	Time    int64 // The gps fix time in epoch timestamp.
+	Motion  bool
 }
 
 func NewManager() *Manager {
@@ -101,7 +102,9 @@ func (self *Manager) Parse(r *http.Request) (*Data, error) {
 	}
 	self.lastFCnt = data.FCnt
 
-	dataParsed.Speed = self.Speed(dataParsed.ID)
+	if dataParsed.Motion {
+		dataParsed.Speed = self.Speed(dataParsed.ID)
+	}
 
 	if len(data.RXInfo) == 0 {
 		if os.Getenv("DEBUG") == "1" {
@@ -204,11 +207,12 @@ func Rpi(data string) (*Data, error) {
 	}
 
 	d := &Data{
-		Lat:   lat,
-		Lon:   lon,
-		Attr:  map[string]string{},
-		Valid: true,
-		Time:  time.Now().Unix(),
+		Lat:    lat,
+		Lon:    lon,
+		Attr:   map[string]string{},
+		Valid:  true,
+		Time:   time.Now().Unix(),
+		Motion: true,
 	}
 
 	singlePoints := len(coordinates) == 3 && coordinates[2] == "s"
@@ -263,6 +267,9 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 
 	if val, ok := data.Object["battery"]; ok {
 		dataParsed.Attr["battery"] = fmt.Sprintf("%v", val.(float64))
+	}
+	if val, ok := data.Object["motion"]; ok && int64(val.(float64)) > 0 {
+		dataParsed.Motion = true
 	}
 
 	return dataParsed, nil
