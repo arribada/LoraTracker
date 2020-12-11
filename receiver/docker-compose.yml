@@ -2,7 +2,7 @@ version: "2.1"
 
 services:
   env-config:
-    image: arribada/env-config@sha256:f17114b261b263dba730c08fcb6e9ee6bc63cd087e18593f33eccb9aeed575fe
+    image: arribada/env-config
     volumes:
     - configs:/configs/
     command:
@@ -345,7 +345,7 @@ services:
   #     - --config.file=/configs/ALERTMANAGER_CONFIG
 
   traccar:
-    image: arribada/traccar:master-alpine@sha256:3a2a49b4a2226be1e144daee570875647679d159fb4572e503c09f03d68971dd
+    image: arribada/traccar:master-alpine
     volumes:
     - configs:/configs/
     - traccar-database:/opt/traccar/data
@@ -357,7 +357,7 @@ services:
      - tracker-server.jar
      - /configs/TRACCAR.xml
   lora-gps-server:
-    image: arribada/lora-gps-server@sha256:0f14b091ed46727dddff704145a83492c1a8090a39296aeeb91ce464f982d4c5
+    image: arribada/lora-gps-server:latest
     ports:
     - "8070:8070"
 
