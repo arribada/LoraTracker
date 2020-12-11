@@ -90,7 +90,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer res.Body.Close()
 
 	if res.StatusCode/100 != 2 {
-		httpError(w, "unexpected response status code:"+strconv.Itoa(res.StatusCode)+" request:"+req.URL.RawQuery, http.StatusBadRequest)
+		httpError(w, "unexpected response status code:"+strconv.Itoa(res.StatusCode)+" request:"+req.URL.Host+"?"+req.URL.RawQuery, http.StatusBadRequest)
 		return
 	}
 	if os.Getenv("DEBUG") == "1" {
