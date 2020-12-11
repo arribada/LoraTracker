@@ -62,7 +62,7 @@ NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The
 
 ```
 cd ./receiver
-balena push LoraGpsReciever
+balena push LoraGpsReceiver
 ```
 - Service Variables for the `chirpstack-appserver` service.
 > replace the `...` with the value from the POSTGRES_PASSWORD env variable.
@@ -89,8 +89,8 @@ Login: admin    admin
 
 - Network-servers/Add
 ```
-name: gpsTracker
-server: chirpstack-networkserver:8000
+name: local
+server: chirpstack-networkserver:8000 # For lorix `localhost:8000`
 ```
 - Service-profiles/Create
 ```
@@ -102,7 +102,7 @@ Add gateway meta-data: selected
     - For Rpi sender
         ```
         name: rpi
-        server: gpsTracker
+        server: main
         LoRaWAN MAC version: 1.0.3
         LoRaWAN Regional Parameters revision: A
         Join (OTAA / ABP): Device supports OTAA
@@ -110,7 +110,7 @@ Add gateway meta-data: selected
     - For Irnas sender
         ```
         name: irnas
-        server: gpsTracker
+        server: main
         LoRaWAN MAC version: 1.0.3
         LoRaWAN Regional Parameters revision: A
         Codec: Custom JavaScript codec functions
@@ -119,11 +119,13 @@ Add gateway meta-data: selected
         ```
 - Gateways/Create
 ```
-name: gpsTracker
+name: main
 description: gpsTracker
-id:... #look for the gateway_ID in the sender's compose file or in the corresponding env variable  if overridden by one. 
-server: gpsTracker
-location: #drag the pin to the current gateway location. This determens when the gps tracker is outside a parimeter and when to send alerts.
+# for rpi sender - look for the gateway_ID in the sender's compose file or in the corresponding env variable  if overridden by one.
+# for lorix one - look at config file in ` /etc/lora-packet-forwarder/global_conf.json`
+id:...
+server: main
+location: #drag the pin to the current gateway location. This determens when the gps tracker is outside a parimeter and when to send Prometheus alerts.
 ```
 - Applications/Create
 ```
@@ -179,6 +181,7 @@ headers:
     SMARTuser: smart
     SMARTpass: smart
     SMARTDesktopFile: # Optional header if you want to create an upload to Smart Desktop. See the section for Smart Desktop setup.
+# Or the IP if not on the same machine as the packet forwarder.
 Uplink data URL: http://lora-gps-server:8070/smartConnect
 ```
 
@@ -187,12 +190,11 @@ Uplink data URL: http://lora-gps-server:8070/smartConnect
 ```
 headers:
     traccarServer: http://traccar:5055
+# Or the IP if not on the same machine as the packet forwarder.
 Uplink data URL: http://lora-gps-server:8070/traccar
 ```
 > multiple uplink urls are separated by coma:<br/>
 > http://lora-gps-server:8070/smartConnect, http://lora-gps-server:8070/traccar
-
-In the traccar sofware add each tracker as device with its corresponding Device EUI(no empty spaces between the pairs).
 
 ## LoraGpsSender setup
  - Env vars
@@ -215,6 +217,9 @@ cd ./sender
 balena push LoraGpsSender
 ```
 
+## Traccar setup
+Add each tracker as device with its corresponding Device EUI(no empty spaces between the pairs).
+
 ## Smart Desktop setup
 
 If you want to upload data into SMART desktop it needs to be connected to SMART connect and also set the content of the data to be uploaded as a header in the chirpstack HTTP integration setup.
@@ -223,9 +228,3 @@ If you want to upload data into SMART desktop it needs to be connected to SMART 
  - Create an example Patrol and export it. This will be used as a template.
  - Take the content of the Patrol file and set it as chirpstack HTTP integration header.
 
-## Adding an additional device
-
-From the balena UI just select `Add a new device` and follow the on screen instructions.
-
-- Select the latest OS
-- Production image
