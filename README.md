@@ -218,7 +218,7 @@ balena push LoraGpsSender
 ```
 
 ## Traccar setup
-Add each tracker as device with its corresponding Device EUI(no empty spaces between the pairs).
+Add each tracker as device with its corresponding Device EUI(no empty spaces between the pairs. All lower case).
 
 ## Smart Desktop setup
 
