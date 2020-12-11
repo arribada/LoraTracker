@@ -114,8 +114,8 @@ Add gateway meta-data: selected
         LoRaWAN MAC version: 1.0.3
         LoRaWAN Regional Parameters revision: A
         Codec: Custom JavaScript codec functions
-            For the decode field use the file decoder.js from this folder
-            For the encode field use the file encoder.js from this folder
+            For the decode field use the file decoder.js from the configs folder
+            For the encode field use the file encoder.js from the configs folder
         ```
 - Gateways/Create
 ```

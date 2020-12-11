@@ -1,0 +1,61 @@
+// Can use these example settings to update the tags throught chirpstack - Enqueue downlink payload
+// Settings port 3
+{
+    "fw_version": 258,
+    "gps_accel_z_threshold": 0,
+    "gps_charge_min": 2500,
+    "gps_cold_fix_retry": 255,
+    "gps_cold_fix_timeout": 200,
+    "gps_fail_retry": 0,
+    "gps_hot_fix_retry": 255,
+    "gps_hot_fix_timeout": 30,
+    "gps_min_ehpe": 50,
+    "gps_min_fix_time": 5,
+    "gps_periodic_interval": 60,
+    "gps_settings": {
+        "d3_fix": 1,
+        "fail_backoff": 1,
+        "fully_resolved": 0,
+        "hot_fix": 1
+    },
+    "gps_triggered_duration": 1,
+    "gps_triggered_interval": 1,
+    "gps_triggered_threshold": 1,
+    "lorawan_datarate_adr": {
+        "adr": 0,
+        "confirmed_uplink": 0,
+        "datarate": 0
+    },
+    "pulse_min_interval": 0,
+    "pulse_on_timeout": 0,
+    "pulse_threshold": 0,
+    "system_charge_max": 5050,
+    "system_charge_min": 2500,
+    "system_functions": {
+        "accelerometer_enabled": 1,
+        "charging_enabled": 1,
+        "gps_hot_fix": 1,
+        "gps_periodic": 0,
+        "gps_triggered": 0,
+        "humidity_enabled": 1,
+        "light_enabled": 1,
+        "temperature_enabled": 1
+    },
+    "system_input_charge_min": 10000,
+    "system_status_interval": 240,
+    "system_voltage_interval": 30
+}
+// This is usefull if the device doesn't acquire GPS.
+// port 99
+{
+    "command": {
+        "reset": true
+    }
+}
+// port 99   
+// Check the current settings.      
+{
+    "command": {
+        "send_settings": true
+    }
+}
