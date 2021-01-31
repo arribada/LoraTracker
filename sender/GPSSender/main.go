@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	log.SetFlags(log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ltime | log.Lshortfile | log.Lmsgprefix)
 
 	debug := os.Getenv("DEBUG") == "1"
 	if debug {

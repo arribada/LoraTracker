@@ -1,8 +1,8 @@
 version: "2.1"
 
 services:
-  env-config:
-    image: arribada/env-config
+  env-to-file:
+    image: arribada/envtofile:master
     volumes:
     - configs:/configs/
     command:
@@ -299,7 +299,7 @@ services:
   #     - GEO_SERVER__BACKEND__NAME=collos
   # chirpstack-postgresql:
   #   depends_on:
-  #     - env-config
+  #     - envtofile
   #   image: postgres:9.6-alpine@sha256:5f30f64d292adba6834c2acf431660c41514a4bdf3b979e6dd2f9930dcf53175
   #   volumes:
   #     - configs:/docker-entrypoint-initdb.d/
