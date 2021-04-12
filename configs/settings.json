@@ -1,5 +1,5 @@
 // Can use these example settings to update the tags throught chirpstack - Enqueue downlink payload
-// Settings port 3
+// port 3
 {
     "fw_version": 258,
     "gps_accel_z_threshold": 0,
@@ -11,10 +11,10 @@
     "gps_hot_fix_timeout": 30,
     "gps_min_ehpe": 50,
     "gps_min_fix_time": 5,
-    "gps_periodic_interval": 60,
+    "gps_periodic_interval": 1,
     "gps_settings": {
         "d3_fix": 1,
-        "fail_backoff": 1,
+        "fail_backoff": 0,
         "fully_resolved": 0,
         "hot_fix": 1
     },
@@ -34,7 +34,7 @@
     "system_functions": {
         "accelerometer_enabled": 1,
         "charging_enabled": 1,
-        "gps_hot_fix": 1,
+        "gps_hot_fix": 0,
         "gps_periodic": 0,
         "gps_triggered": 0,
         "humidity_enabled": 1,
