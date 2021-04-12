@@ -3,7 +3,6 @@
 
 
 TODO:
-
  - how to deal with backloging when the sender is out of range?
     backloging in connect might be  possible by providing a date with the alert api call.
     backlogging in Prometheus is possible, but tricky
@@ -86,6 +85,11 @@ TracCar: https://deviceIPorDomain<br/>
 Login: admin    admin
 
 ### Setup chirpstack app server
+
+> If the redis server doesn't start after lorix restart
+> ```
+> /usr/bin/redis-check-aof --fix /var/lib/redis/appendonly.aof <<< 'yes'
+> ```
 
 - Network-servers/Add
 ```
