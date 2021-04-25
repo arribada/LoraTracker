@@ -2,14 +2,6 @@
 ![Blueprints](blueprints.svg)
 
 
-TODO:
- - how to deal with backloging when the sender is out of range?
-    backloging in connect might be  possible by providing a date with the alert api call.
-    backlogging in Prometheus is possible, but tricky
-    sending a single update with the lowest data rate setting takes 1-2 minutes so the speed for sending backlogs is not enough. need add an option to increase the speed based on the signal strength.
- - the concetrator hangs sometime so reset it if doesn't receive any packets in 10mins.
-
-
 # Setup Pager duty account for the alerting(optional).
  - Sign up for an account.
  - Add a phone number under the profile Notification Rules.
