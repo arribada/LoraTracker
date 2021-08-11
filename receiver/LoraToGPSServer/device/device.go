@@ -32,6 +32,7 @@ type Data struct {
 	Speed   float64
 	Time    int64 // The gps fix time in epoch timestamp.
 	Motion  bool
+	Hdop    float64
 }
 
 func NewManager() *Manager {
@@ -246,6 +247,10 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 	if !ok {
 		return nil, errors.New("data object doesn't contain lon")
 	}
+	hdop, ok := data.Object["hdop"]
+	if !ok {
+		return nil, errors.New("data object doesn't contain hdop")
+	}
 
 	// When resent is more than 1 it means NO new gps coordinates are available and
 	// the latest ones were resent so can be ignored.
@@ -253,6 +258,7 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 		dataParsed.Valid = false
 	}
 
+	dataParsed.Hdop = hdop.(float64)
 	dataParsed.Lat = lat.(float64)
 	dataParsed.Lon = lon.(float64)
 	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {

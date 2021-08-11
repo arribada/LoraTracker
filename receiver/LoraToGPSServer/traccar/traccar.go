@@ -51,6 +51,24 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if hdop := os.Getenv("HDOP"); hdop != "" {
+		hdopF, err := strconv.ParseFloat(hdop, 32)
+		if err != nil {
+			errStr := fmt.Sprintf("error parsing env hdop value:%+v err:%v", hdop, err)
+			log.Print(errStr)
+			httpError(w, errStr, http.StatusBadRequest)
+			return
+		}
+
+		if data.Hdop > hdopF {
+			if os.Getenv("DEBUG") == "1" {
+				log.Printf("skipping data with high HDOP current:%+v, threshold:%v", data.Hdop, hdopF)
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+
 	server, ok := r.Header["Traccarserver"]
 	if !ok || len(server) != 1 {
 		httpError(w, "missing or incorrect traccarServer header", http.StatusBadRequest)
