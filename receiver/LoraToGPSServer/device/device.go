@@ -247,10 +247,14 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 	if !ok {
 		return nil, errors.New("data object doesn't contain lon")
 	}
+
+	// Port 12 status messages contain only lat/lon.
 	hdop, ok := data.Object["hdop"]
 	if !ok {
-		return nil, errors.New("data object doesn't contain hdop")
+		log.Printf("data object doesn't contain hdop so setting to 0 fport:%+v", data.FPort)
+		hdop = hdop.(float64)
 	}
+	dataParsed.Hdop = hdop.(float64)
 
 	// When resent is more than 1 it means NO new gps coordinates are available and
 	// the latest ones were resent so can be ignored.
@@ -258,7 +262,6 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 		dataParsed.Valid = false
 	}
 
-	dataParsed.Hdop = hdop.(float64)
 	dataParsed.Lat = lat.(float64)
 	dataParsed.Lon = lon.(float64)
 	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
