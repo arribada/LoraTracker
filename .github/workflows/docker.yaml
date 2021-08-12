@@ -2,18 +2,49 @@
 jobs:
   push:
     runs-on: ubuntu-latest
-    name: Push Docker image for LoraToGPSServer
     steps:
-      - name: Checkout master
-        uses: actions/checkout@master
-      - name: Print Branch name
-        run: 'echo running on branch ${GITHUB_REF##*/}'
-      - name: Build and publish image
-        uses: arribada/docker_buildx@master
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+      -
+        name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
         with:
-          publish: true
-          tag: '${GITHUB_REF##*/}'
-          imageName: arribada/lora-gps-server
-          dockerHubUser: '${{ secrets.DOCKER_USER }}'
-          dockerHubPassword: '${{ secrets.DOCKER_PASS }}'
-          buildContext: receiver/LoraToGPSServer
+          images: arribada/${{ github.event.repository.name }}
+      -
+        uses: docker/setup-buildx-action@v1
+        id: buildx
+        with:
+          install: true
+      -
+        name: Login to DockerHub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: receiver/LoraToGPSServer
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+    # name: Create and push a Docker image
+    # steps:
+    #   - name: Checkout master
+    #     uses: actions/checkout@master
+    #   - name: Print Branch name
+    #     run: 'echo running on branch ${GITHUB_REF##*/}'
+    #   - name: Build and publish image
+    #     uses: arribada/docker_buildx@master
+    #     with:
+    #       publish: true
+    #       tag: '${GITHUB_REF##*/}'
+    #       imageName: arribada/lora-gps-server
+    #       dockerHubUser: '${{ secrets.DOCKER_USER }}'
+    #       dockerHubPassword: '${{ secrets.DOCKER_PASS }}'
+    #       buildContext: receiver/LoraToGPSServer
