@@ -11,7 +11,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: arribada/${{ github.event.repository.name }}
+          images: arribada/lora-gps-server
       -
         uses: docker/setup-buildx-action@v1
         id: buildx
@@ -29,22 +29,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: receiver/LoraToGPSServer
+          platforms: linux/amd64,linux/arm64/v7,linux/arm64/v8
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-    # name: Create and push a Docker image
-    # steps:
-    #   - name: Checkout master
-    #     uses: actions/checkout@master
-    #   - name: Print Branch name
-    #     run: 'echo running on branch ${GITHUB_REF##*/}'
-    #   - name: Build and publish image
-    #     uses: arribada/docker_buildx@master
-    #     with:
-    #       publish: true
-    #       tag: '${GITHUB_REF##*/}'
-    #       imageName: arribada/lora-gps-server
-    #       dockerHubUser: '${{ secrets.DOCKER_USER }}'
-    #       dockerHubPassword: '${{ secrets.DOCKER_PASS }}'
-    #       buildContext: receiver/LoraToGPSServer
