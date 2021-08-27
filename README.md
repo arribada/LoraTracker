@@ -2,28 +2,15 @@
 ![Blueprints](blueprints.svg)
 
 
-# Setup Pager duty account for the alerting(optional).
- - Sign up for an account.
- - Add a phone number under the profile Notification Rules.
- - Create a service.
- - Choose the integration as API V2.
- - copy the `Integration Key` and add it as an env vairable called `PAGERDUTY_ROUTING_KEY` with the balena setup(see below).
-
-# Setup Slack for alerting(optional).
-- Create a slack channel for receiving the alerts.
-- Install the [Slack Webhooks App](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks)
-- Copy the Webhook URL and add it as an env vairable called `SLACK_API_URL` with the balena setup(see below).
-
 # Initial Setup on Balena cloud
 
 Create an application for the sender and the receiver: `LoraGpsSender`, `LoraGpsReciever`.
+If you use standalone GPS tags for sending don't need to create an app for the sender.
 
 ## LoraGpsReciever Setup
+> Skip when using Lorix one for receiving.
 
-Chirpstack server can run directly on the Rpi(Lora hat) or on a Lorix Gateway.
- - For chirsptack on Lorix install using https://www.chirpstack.io/gateway-os/install/wifx/ and comment out all chirpstack containers in the compose file.
-
-- Fleet configuration
+- When using the Lora hat for recieving add these env vars in the fleet configuration.
 ```
 RESIN_HOST_CONFIG_enable_uart
 RESIN_HOST_CONFIG_dtparam "i2c_arm=on","spi=on","audio=on"
@@ -32,19 +19,25 @@ RESIN_HOST_CONFIG_core_freq 250 // Seems that uart is more stable with this.
 RESIN_HOST_CONFIG_gpu_mem 16mb
 ```
 
- - Env vars
+ - Add fleet env vars
+ 
+ For the Chirpstack server.
 ```
-PAGERDUTY_ROUTING_KEY=... # The "Integration Key" from Pager Duty for sending  alerts with the alert manager.
-SLACK_API_URL=... # The "Webhook URL" from the Slack Webhooks App.
-
-# Skip vars below if not using the Rpi as chirpstack server.
-APPLICATION__SERVER_EXTERNAL__API_JWT__SECRET=....
+APPLICATION_SERVER__EXTERNAL_API__JWT_SECRET=.... # Choose one
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=...
-CONCENTRATOR_CONFIG= // The semtech gateway setting. See https://github.com/arribada/packet-forwarder
-NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The default is EU_863_870. For all possible options see https://www.chirpstack.io/network-server
+POSTGRES_PASSWORD=... # Choose one
+# The chirpstack network server band settings. 
+# The default is EU_863_870 so if used in europe can skip this var.
+#For all possible options see https://www.chirpstack.io/network-server
+NETWORK_SERVER__BAND__NAME =
 ```
-
+ 
+- Env vars for the Rpi Lora hat.
+> Skip if using Lorix one.
+```
+# The semtech gateway setting. See https://github.com/arribada/packet-forwarder
+CONCENTRATOR_CONFIG= 
+```
 
 
 - Add a device and follow the UI steps.
@@ -53,27 +46,29 @@ NETWORK_SERVER__BAND__NAME = // The chirpstack network server band settings. The
 
 ```
 cd ./receiver
-balena push LoraGpsReceiver
+balena push FleetName # The selected fleet name when creating the fleet.
 ```
-- Service Variables for the `chirpstack-appserver` service.
+- At fleet level add service variables
 > replace the `...` with the value from the POSTGRES_PASSWORD env variable.
 
+for the `chirpstack-appserver` service.
 ```
-POSTGRESQL_DSN=postgres://chirpstack_as:...@chirpstack-postgresql/chirpstack_as?sslmode=disable
+POSTGRESQL__DSN=postgres://chirpstack_as:...@chirpstack-postgresql/chirpstack_as?sslmode=disable
 ```
-- Service Variables for the `chirpstack-networkserver` service.
+for the `chirpstack-networkserver` service.
 ```
-POSTGRESQL_DSN=postgres://chirpstack_ns:...@chirpstack-postgresql/chirpstack_ns?sslmode=disable
+POSTGRESQL__DSN=postgres://chirpstack_ns:...@chirpstack-postgresql/chirpstack_ns?sslmode=disable
 ```
 
 ### Access the applications:
-Chirpstack App Server: http://deviceIPorDomain:8080<br/>
+Enable the option PUBLIC DEVICE URL and click the link next to the option.
+Chirpstack App Server: http://url:8080<br/>
 Login: admin admin
 
-SMART connect: https://deviceIPorDomain:8443/server<br/>
+SMART connect: https://url:8443/server<br/>
 Login: smart smart
 
-TracCar: https://deviceIPorDomain<br/>
+TracCar: https://url<br/>
 Login: admin    admin
 
 ### Setup chirpstack app server
@@ -98,7 +93,7 @@ Add gateway meta-data: selected
     - For Rpi sender
         ```
         name: rpi
-        server: main
+        server: local
         LoRaWAN MAC version: 1.0.3
         LoRaWAN Regional Parameters revision: A
         Join (OTAA / ABP): Device supports OTAA
@@ -106,7 +101,7 @@ Add gateway meta-data: selected
     - For Irnas sender
         ```
         name: irnas
-        server: main
+        server: local
         LoRaWAN MAC version: 1.0.3
         LoRaWAN Regional Parameters revision: A
         Codec: Custom JavaScript codec functions
@@ -117,11 +112,11 @@ Add gateway meta-data: selected
 ```
 name: main
 description: gpsTracker
-# for rpi sender - look for the gateway_ID in the sender's compose file or in the corresponding env variable  if overridden by one.
-# for lorix one - look at config file in ` /etc/lora-packet-forwarder/global_conf.json`
+# for Rpi sender - look for the gateway_ID in the sender's compose file or in the corresponding env variable  if overridden by one.
+# for Lorix one - http://deviceIPorDomain:8080/lora/forwarder or in the config file:` /etc/lora-packet-forwarder/global_conf.json` 
 id:...
 server: main
-location: #drag the pin to the current gateway location. This determens when the gps tracker is outside a parimeter and when to send Prometheus alerts.
+location: #drag the pin to the current gateway location. This determines when a gps tag is outside a parimeter and when to send Prometheus alerts.
 ```
 - Applications/Create
 ```
@@ -193,6 +188,7 @@ Uplink data URL: http://lora-gps-server:8070/traccar
 > http://lora-gps-server:8070/smartConnect, http://lora-gps-server:8070/traccar
 
 ## LoraGpsSender setup
+> skip when not using the Rpi sender.
  - Env vars
 ```
 APP_KEY= // the one set in Chirpstack app server
@@ -223,4 +219,3 @@ If you want to upload data into SMART desktop it needs to be connected to SMART 
  - Setup the connection to SMART connect. It requires HTTPS and for this can use the default certificate in https://github.com/arribada/SMARTConnect
  - Create an example Patrol and export it. This will be used as a template.
  - Take the content of the Patrol file and set it as chirpstack HTTP integration header.
-

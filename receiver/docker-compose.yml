@@ -8,51 +8,54 @@ services:
     command:
         - --dir=/configs/
     environment:
-      PROMETHEUS_CONFIG: |-
-        global:
-          scrape_interval:     5s
-        scrape_configs:
-          - job_name: 'lora-gps-server'
-            static_configs:
-            - targets: ['lora-gps-server:8070']
-        alerting:
-          alertmanagers:
-          - static_configs:
-            - targets:
-                - alertmanager:9093
-        rule_files:
-            - /configs/PROMETHEUS_ALERTING
-      PROMETHEUS_ALERTING: |-
-        groups:
-        - name: /etc/prometheus/alert.rules
-          rules:
-          - alert: GPSNoUpdate
-            expr: last_update_seconds>6000
-            labels:
-              severity: "critical"
-            annotations:
-              summary: \"GPS tracker hasn't sent data\"
-          - alert: GPSPerimeterBreach
-            expr: max_over_time(distance_meters[1m])>1000
-            labels:
-              severity: "critical"
-            annotations:
-              summary: \"GPS tracker parameter threshold\"
-      ALERTMANAGER_CONFIG: |-
-        route:
-          receiver: 'default'
-          routes:
-          - match:
-                alertname: GPSPerimeterBreach
-          - match:
-                alertname: GPSNoUpdate
-        receivers:
-        - name: 'default'
-          pagerduty_configs:
-          - routing_key: $PAGERDUTY_ROUTING_KEY
-          slack_configs:
-            - api_url: $SLACK_API_URL
-              send_resolved: true
+      # PROMETHEUS_CONFIG: |-
+      #   global:
+      #     scrape_interval:     5s
+      #   scrape_configs:
+      #     - job_name: 'lora-gps-server'
+      #       static_configs:
+      #       - targets: ['lora-gps-server:8070']
+      #   alerting:
+      #     alertmanagers:
+      #     - static_configs:
+      #       - targets:
+      #           - alertmanager:9093
+      #   rule_files:
+      #       - /configs/PROMETHEUS_ALERTING
+      # PROMETHEUS_ALERTING: |-
+      #   groups:
+      #   - name: /etc/prometheus/alert.rules
+      #     rules:
+      #     - alert: GPSNoUpdate
+      #       expr: last_update_seconds>6000
+      #       labels:
+      #         severity: "critical"
+      #       annotations:
+      #         summary: \"GPS tracker hasn't sent data\"
+      #     - alert: GPSPerimeterBreach
+      #       expr: max_over_time(distance_meters[1m])>1000
+      #       labels:
+      #         severity: "critical"
+      #       annotations:
+      #         summary: \"GPS tracker parameter threshold\"
+      # ALERTMANAGER_CONFIG: |-
+      #   route:
+      #     receiver: 'default'
+      #     routes:
+      #     - match:
+      #           alertname: GPSPerimeterBreach
+      #     - match:
+      #           alertname: GPSNoUpdate
+      #   receivers:
+      #   - name: 'default'
+      #     pagerduty_configs:
+      #     - routing_key: $PAGERDUTY_ROUTING_KEY
+      #     slack_configs:
+      #       - api_url: $SLACK_API_URL
+      #         send_resolved: true
+      mosquitto_conf: |-
+        listener 1883
+        allow_anonymous true
       INIT_CHIRPSTACK_sh: |-
         #!/bin/bash
         set -e
@@ -95,7 +98,7 @@ services:
             <entry key='report.trip.minimalParkingDuration'>1</entry>
         </properties>
 
-### Chirpstack containers.
+### Rpi Lora Hat
   # packet-forwarder:
   #   image: arribada/packet-forwarder@sha256:7ea7afe7ecc5080be0e882e3f310c373bd8a29503c6c647063fad40ba7d76d60
   #   privileged: true
@@ -270,46 +273,48 @@ services:
   #             "beacon_infodesc": 0
   #         }
   #       }
-  # # chirpstack-networkserver:
-  #   image: arribada/chirpstack-networkserver@sha256:10df9b71dc5db60048edacff50dc29f8a51729224c542b1d384e79123f43bb03
-  #   environment:
-  #     - REDIS__URL=redis://chirpstack-redis:6379
-  #     - NETWORK_SERVER__BAND__NAME=EU_863_870
-  #     - NETWORK_SERVER__GATEWAY__BACKEND__MQTT__SERVER=tcp://chirpstack-mosquitto:1883
-  #     - JOIN_SERVER__DEFAULT__SERVER=http://chirpstack-appserver:8003
-  #     - GEOLOCATION_SERVER__SERVER=chirpstack-geoserver:8005
-  # chirpstack-appserver:
-  #   image: arribada/chirpstack-app-server@sha256:d6b02df980166ff4332c4f9a3b9904a524dc37494458db6a93a7b9ca16e303b7
-  #   ports:
-  #     - 8080:8080
-  #   environment:
-  #     - REDIS__URL=redis://chirpstack-redis:6379
-  #     - APPLICATION_SERVER__INTEGRATION__MQTT__SERVER=tcp://chirpstack-mosquitto:1883
-  #     - APPLICATION_SERVER__API__PUBLIC_HOST=chirpstack-appserver:8001
 
-  # chirpstack-gatewaybridge:
-  #   image: arribada/chirpstack-gateway-bridge@sha256:bb45ed039fb3ba6d4a5a8674edb63bdf80f4aa66a8e952b7cd50db368122ff51
-  #   ports:
-  #     - 1700:1700/udp
-  #   environment:
-  #     - INTEGRATION__MQTT__AUTH__GENERIC__SERVERS=tcp://chirpstack-mosquitto:1883
-  # chirpstack-geoserver:
-  #   image: arribada/chirpstack-geo-server@sha256:4459e83e306e0fb5e02b862c14383067c7043730ef67e785ffdf5f120dba42d6
-  #   environment:
-  #     - GEO_SERVER__BACKEND__NAME=collos
-  # chirpstack-postgresql:
-  #   depends_on:
-  #     - envtofile
-  #   image: postgres:9.6-alpine@sha256:5f30f64d292adba6834c2acf431660c41514a4bdf3b979e6dd2f9930dcf53175
-  #   volumes:
-  #     - configs:/docker-entrypoint-initdb.d/
-  #     - chirpstack-postgres:/var/lib/postgresql/data
-  # chirpstack-redis:
-  #   image: redis:5-alpine@sha256:f56ac9669267aec516ebfb8d7f61fc6344b7c93d9b24f45e0f952c6f74f36015
-  #   volumes:
-  #     - chirpstack-redis:/data
-  # chirpstack-mosquitto:
-  #   image: eclipse-mosquitto@sha256:98b755512a8487877e2e98cbf3ba7a4987bc71d8e1c632d5aa86f43ee7db0e34
+### Chirpstack containers.
+  chirpstack-networkserver:
+    image: chirpstack/chirpstack-network-server:3.15.0-test.2
+    environment:
+      - REDIS__URL=redis://chirpstack-redis:6379
+      - NETWORK_SERVER__BAND__NAME=EU_863_870
+      - NETWORK_SERVER__GATEWAY__BACKEND__MQTT__SERVER=tcp://chirpstack-mosquitto:1883
+      - JOIN_SERVER__DEFAULT__SERVER=http://chirpstack-appserver:8003
+      - GEOLOCATION_SERVER__SERVER=chirpstack-geoserver:8005
+  chirpstack-appserver:
+    image: chirpstack/chirpstack-application-server:3.17.0-test.2
+    ports:
+      - 8080:8080
+    environment:
+      - REDIS__URL=redis://chirpstack-redis:6379
+      - APPLICATION_SERVER__INTEGRATION__MQTT__SERVER=tcp://chirpstack-mosquitto:1883
+      - APPLICATION_SERVER__API__PUBLIC_HOST=chirpstack-appserver:8001
+
+  chirpstack-gatewaybridge:
+    image: chirpstack/chirpstack-gateway-bridge:3.13.0-test.2
+    ports:
+      - 1700:1700/udp
+    environment:
+      - INTEGRATION__MQTT__AUTH__GENERIC__SERVERS=tcp://chirpstack-mosquitto:1883
+  chirpstack-postgresql:
+    depends_on:
+      - env-to-file
+    image: postgres:9.6-alpine
+    volumes:
+      - configs:/docker-entrypoint-initdb.d/
+      - chirpstack-postgres:/var/lib/postgresql/data
+  chirpstack-redis:
+    image: redis:6.2.5-alpine
+    volumes:
+      - chirpstack-redis:/data
+  chirpstack-mosquitto:
+    ports:
+      - 1883:1883
+    image: eclipse-mosquitto:2.0.11
+    volumes:
+      - configs:/mosquitto/config/
 
   # smart-postgres:
   #   image: arribada/smart-connect-postgis@sha256:96787a45e1146ac3cd88cad15aa89243d74738e574e6b9730a07415616e3e521
@@ -345,7 +350,7 @@ services:
   #     - --config.file=/configs/ALERTMANAGER_CONFIG
 
   traccar:
-    image: arribada/traccar:master-alpine
+    image: traccar/traccar:4.14-ubuntu
     volumes:
     - configs:/configs/
     - traccar-database:/opt/traccar/data
@@ -357,7 +362,7 @@ services:
      - tracker-server.jar
      - /configs/TRACCAR.xml
   lora-gps-server:
-    image: arribada/lora-gps-server:latest
+    image: arribada/lora-gps-server:master
     ports:
     - "8070:8070"
 
@@ -365,8 +370,8 @@ services:
 volumes:
   # smart-postgres:
   # smart-connect:
-  # chirpstack-postgres:
-  # chirpstack-redis:
+  chirpstack-postgres:
+  chirpstack-redis:
   # prometheus:
   # alertmanager:
   traccar-database:

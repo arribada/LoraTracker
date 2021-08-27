@@ -9,7 +9,7 @@
     "gps_fail_retry": 0,
     "gps_hot_fix_retry": 50,
     "gps_hot_fix_timeout": 60,
-    "gps_min_ehpe": 50,
+    "gps_min_ehpe": 20,
     "gps_min_fix_time": 40,
     "gps_periodic_interval": 1,
     "gps_settings": {
