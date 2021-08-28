@@ -4,24 +4,23 @@
 
 # Initial Setup on Balena cloud
 
+> Follow the steps in the exact order as the initial boostrap relies on given env variables to be present.
+
 Create an application for the sender and the receiver: `LoraGpsSender`, `LoraGpsReciever`.
 If you use standalone GPS tags for sending don't need to create an app for the sender.
 
 ## LoraGpsReciever Setup
-> Skip when using Lorix one for receiving.
 
-- When using the Lora hat for recieving add these env vars in the fleet configuration.
+### At fleet level add env vars
+
+ - For the Rpi Lora hat (Skip when using Lorix one for receiving)
+
 ```
-RESIN_HOST_CONFIG_enable_uart
-RESIN_HOST_CONFIG_dtparam "i2c_arm=on","spi=on","audio=on"
-RESIN_HOST_CONFIG_dtoverlay pi3-disable-bt
-RESIN_HOST_CONFIG_core_freq 250 // Seems that uart is more stable with this.
-RESIN_HOST_CONFIG_gpu_mem 16mb
+ # The semtech gateway setting. See https://github.com/arribada/packet-forwarder
+CONCENTRATOR_CONFIG=
 ```
 
- - Add fleet env vars
- 
- For the Chirpstack server.
+ - For the Chirpstack server.
 ```
 APPLICATION_SERVER__EXTERNAL_API__JWT_SECRET=.... # Choose one
 POSTGRES_USER=postgres
@@ -31,16 +30,18 @@ POSTGRES_PASSWORD=... # Choose one
 #For all possible options see https://www.chirpstack.io/network-server
 NETWORK_SERVER__BAND__NAME =
 ```
- 
-- Env vars for the Rpi Lora hat.
-> Skip if using Lorix one.
+
+### Fleet configuration (Skip when using Lorix one for receiving)
 ```
-# The semtech gateway setting. See https://github.com/arribada/packet-forwarder
-CONCENTRATOR_CONFIG= 
+RESIN_HOST_CONFIG_enable_uart
+RESIN_HOST_CONFIG_dtparam "i2c_arm=on","spi=on","audio=on"
+RESIN_HOST_CONFIG_dtoverlay pi3-disable-bt
+RESIN_HOST_CONFIG_core_freq 250 // Seems that uart is more stable with this.
+RESIN_HOST_CONFIG_gpu_mem 16mb
 ```
 
 
-- Add a device and follow the UI steps.
+### Add a device and follow the UI steps.
 
 - Install the [balena cli](https://github.com/balena-io/balena-cli) and apply the application compose file.
 
@@ -48,14 +49,14 @@ CONCENTRATOR_CONFIG=
 cd ./receiver
 balena push FleetName # The selected fleet name when creating the fleet.
 ```
-- At fleet level add service variables
+### At fleet level add service variables
 > replace the `...` with the value from the POSTGRES_PASSWORD env variable.
 
-for the `chirpstack-appserver` service.
+ - for the `chirpstack-appserver` service.
 ```
 POSTGRESQL__DSN=postgres://chirpstack_as:...@chirpstack-postgresql/chirpstack_as?sslmode=disable
 ```
-for the `chirpstack-networkserver` service.
+ - for the `chirpstack-networkserver` service.
 ```
 POSTGRESQL__DSN=postgres://chirpstack_ns:...@chirpstack-postgresql/chirpstack_ns?sslmode=disable
 ```
@@ -72,8 +73,8 @@ TracCar: https://url<br/>
 Login: admin    admin
 
 ### Setup chirpstack app server
+> If the redis server doesn't start after a restart
 
-> If the redis server doesn't start after lorix restart
 > ```
 > /usr/bin/redis-check-aof --fix /var/lib/redis/appendonly.aof <<< 'yes'
 > ```
@@ -90,7 +91,7 @@ server: gpsTracker
 Add gateway meta-data: selected
 ```
 - Device-profiles/Create
-    - For Rpi sender
+    - For Rpi sender (skip when not using the Rpi sender)
         ```
         name: rpi
         server: local
@@ -127,7 +128,7 @@ codec:none
 ```
 - Applications/gpsTracker/Devices/Create
 
-  - Rpi sender
+  - Rpi sender (skip when not using the Rpi sender)
     ```
     name: rpi
     description: rpi
@@ -189,13 +190,14 @@ Uplink data URL: http://lora-gps-server:8070/traccar
 
 ## LoraGpsSender setup
 > skip when not using the Rpi sender.
- - Env vars
+
+### At fleet level add env vars
 ```
 APP_KEY= // the one set in Chirpstack app server
 DEV_EUI= // the one set in Chirpstack app server
 BAND= // by default is is set to EU868 , other possible values are: AS923, EU868, AU915, US915, IN865, KR920
 ```
- - Fleet configuration
+### Fleet configuration
 ```
 RESIN_HOST_CONFIG_enable_uart
 RESIN_HOST_CONFIG_dtoverlay pi3-miniuart-bt
