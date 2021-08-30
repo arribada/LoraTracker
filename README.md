@@ -47,7 +47,7 @@ RESIN_HOST_CONFIG_gpu_mem 16mb
 
 ```
 cd ./receiver
-balena push FleetName # The selected fleet name when creating the fleet.
+balena push FleetNameReciever # The selected fleet name when creating the fleet.
 ```
 ### At fleet level add service variables
 > replace the `...` with the value from the POSTGRES_PASSWORD env variable.
@@ -112,9 +112,9 @@ Add gateway meta-data: selected
 - Gateways/Create
 ```
 name: main
-description: gpsTracker
+description: anything
 # for Rpi sender - look for the gateway_ID in the sender's compose file or in the corresponding env variable  if overridden by one.
-# for Lorix one - http://deviceIPorDomain:8080/lora/forwarder or in the config file:` /etc/lora-packet-forwarder/global_conf.json` 
+# for Lorix one - http://lorixOneIP/lora/forwarder or in the config file:` /etc/lora-packet-forwarder/global_conf.json`
 id:...
 server: main
 location: #drag the pin to the current gateway location. This determines when a gps tag is outside a parimeter and when to send Prometheus alerts.
@@ -162,7 +162,7 @@ codec:none
 
 ### Setup Chirpstack to send the data to other systems(optional).
 
-#### <b>SMART connect</b>
+#### SMART connect
 
 - Applications/gpsTracker/Integrations/Create
 ```
@@ -177,7 +177,14 @@ headers:
 Uplink data URL: http://lora-gps-server:8070/smartConnect
 ```
 
-#### <b>Traccar</b>
+### Setup Lorix to connect to Chirpstack
+
+ - Login to lorix using the WEB gui with `admin` and `lorix4u`
+ - Navigate to Lora -> Forwarder -> Select `Chirpstack Gateway Bridge`
+ - Edit the `Bridge configuration` and under the `mqtt` section add the IP address of the Rpi like `server="tcp://192.168.1.188:1883"`. For now Lorix OS doesn't support mDNS names so need to set a static address for the IP so that it doesn't change between restarts.
+ - Save and click the `Start` button. The logs should show no errors which means it is connected to chirpstack
+
+#### Traccar
 - Applications/gpsSender/Integrations/http
 ```
 headers:
@@ -208,7 +215,7 @@ RESIN_HOST_CONFIG_dtoverlay pi3-miniuart-bt
 
 ```
 cd ./sender
-balena push LoraGpsSender
+balena push FleetNameSender
 ```
 
 ## Traccar setup
