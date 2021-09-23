@@ -145,7 +145,7 @@ codec:none
     ```
   - Irnas sender
     ```
-    name: irnas
+    name: (the tag ID)
     description: irnas
     EUI: # Take it from https://console.thethingsnetwork.org/
     profile: irnas
@@ -187,6 +187,7 @@ Uplink data URL: http://lora-gps-server:8070/smartConnect
 #### Traccar
 - Applications/gpsSender/Integrations/http
 ```
+Payload marshaler: JSON legacy
 headers:
     traccarServer: http://traccar:5055
 # Or the IP if not on the same machine as the packet forwarder.
