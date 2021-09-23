@@ -67,7 +67,7 @@ func (self *Manager) Parse(r *http.Request) (*Data, error) {
 	data := &DataUpPayload{}
 	err = json.Unmarshal(c, data)
 	if err != nil {
-		return nil, errors.Wrap(err, "unmarshaling request body ")
+		return nil, errors.Wrap(err, "unmarshaling request body")
 	}
 
 	devType, ok := data.Tags["type"]
@@ -252,7 +252,7 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 	hdop, ok := data.Object["hdop"]
 	if !ok {
 		log.Printf("data object doesn't contain hdop so setting to 0 fport:%+v", data.FPort)
-		hdop = hdop.(float64)
+		hdop = 0
 	}
 	dataParsed.Hdop = hdop.(float64)
 
