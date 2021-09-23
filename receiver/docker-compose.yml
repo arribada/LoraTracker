@@ -286,7 +286,7 @@ services:
     image: chirpstack/chirpstack-network-server:3.15.0-test.2
     environment:
       - REDIS__URL=redis://chirpstack-redis:6379
-      - NETWORK_SERVER__BAND__NAME=EU_863_870
+      - NETWORK_SERVER__BAND__NAME=EU868
       - NETWORK_SERVER__GATEWAY__BACKEND__MQTT__SERVER=tcp://chirpstack-mosquitto:1883
       - JOIN_SERVER__DEFAULT__SERVER=http://chirpstack-appserver:8003
       - GEOLOCATION_SERVER__SERVER=chirpstack-geoserver:8005
