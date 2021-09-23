@@ -252,7 +252,7 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 	hdop, ok := data.Object["hdop"]
 	if !ok {
 		log.Printf("data object doesn't contain hdop so setting to 0 fport:%+v", data.FPort)
-		hdop = 0
+		hdop = 0.0
 	}
 	dataParsed.Hdop = hdop.(float64)
 
