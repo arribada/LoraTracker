@@ -293,7 +293,7 @@ services:
   chirpstack-appserver:
     image: chirpstack/chirpstack-application-server:3.17.0-test.2
     ports:
-      - 8080:8080
+      - "8080:8080"
     environment:
       - REDIS__URL=redis://chirpstack-redis:6379
       - APPLICATION_SERVER__INTEGRATION__MQTT__SERVER=tcp://chirpstack-mosquitto:1883
@@ -312,7 +312,7 @@ services:
       - chirpstack-redis:/data
   chirpstack-mosquitto:
     ports:
-      - 1883:1883
+      - "1883:1883"
     image: eclipse-mosquitto:2.0.11
     volumes:
       - configs:/mosquitto/config/
@@ -346,7 +346,7 @@ services:
   #   - configs:/configs/
   #   - alertmanager:/alertmanager
   #   ports:
-  #     - 9093:9093
+  #     - "9093:9093"
   #   command:
   #     - --config.file=/configs/ALERTMANAGER_CONFIG
 
@@ -356,8 +356,8 @@ services:
     - configs:/configs/
     - traccar-database:/opt/traccar/data
     ports:
-      - 80:8082
-      - 5055:5055
+      - "80:8082"
+      - "5055:5055"
     command:
      - -jar
      - tracker-server.jar

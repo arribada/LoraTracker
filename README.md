@@ -160,6 +160,13 @@ codec:none
     Application session key:
     ```
 
+### Setup Lorix to connect to Chirpstack
+
+ - Login to lorix using the WEB gui with `admin` and `lorix4u`
+ - Navigate to Lora -> Forwarder -> Select `Chirpstack Gateway Bridge`
+ - Edit the `Bridge configuration` and under the `mqtt` section add the IP address of the Rpi like `server="tcp://192.168.1.188:1883"`. For now Lorix OS doesn't support mDNS names so need to set a static address for the IP so that it doesn't change between restarts.
+ - Save and click the `Start` button. The logs should show no errors which means it is connected to chirpstack
+
 ### Setup Chirpstack to send the data to other systems(optional).
 
 #### SMART connect
@@ -176,13 +183,6 @@ headers:
 # Or the IP if not on the same machine as the packet forwarder.
 Uplink data URL: http://lora-gps-server:8070/smartConnect
 ```
-
-### Setup Lorix to connect to Chirpstack
-
- - Login to lorix using the WEB gui with `admin` and `lorix4u`
- - Navigate to Lora -> Forwarder -> Select `Chirpstack Gateway Bridge`
- - Edit the `Bridge configuration` and under the `mqtt` section add the IP address of the Rpi like `server="tcp://192.168.1.188:1883"`. For now Lorix OS doesn't support mDNS names so need to set a static address for the IP so that it doesn't change between restarts.
- - Save and click the `Start` button. The logs should show no errors which means it is connected to chirpstack
 
 #### Traccar
 - Applications/gpsSender/Integrations/http
