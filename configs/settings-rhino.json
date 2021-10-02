@@ -1,0 +1,42 @@
+// Can use these example settings to update the tags throught chirpstack - Enqueue downlink payload
+// port 3
+{
+    "gps_charge_min": 3000,
+    "gps_cold_fix_retry": 255,
+    "gps_cold_fix_timeout": 200,
+    "gps_fail_retry": 0,
+    "gps_hot_fix_retry": 50,
+    "gps_hot_fix_timeout": 60,
+    "gps_min_ehpe": 30,
+    "gps_min_fix_time": 30,
+    "gps_periodic_interval": 1,
+    "gps_settings": {
+        "d3_fix": 1,
+        "fail_backoff": 0,
+        "fully_resolved": 0,
+        "hot_fix": 1
+    },
+    "gps_triggered_duration": 1,
+    "gps_triggered_interval": 1,
+    "gps_triggered_threshold": 1,
+    "lorawan_datarate_adr": {
+        "adr": 0,
+        "confirmed_uplink": 0,
+        "datarate": 0
+    },
+    "system_charge_max": 4100,
+    "system_charge_min": 3900,
+    "system_functions": {
+        "accelerometer_enabled": 1,
+        "charging_enabled": 1,
+        "gps_hot_fix": 0,
+        "gps_periodic": 0,
+        "gps_triggered": 0,
+        "humidity_enabled": 0,
+        "light_enabled": 0,
+        "temperature_enabled": 0
+    },
+    "system_input_charge_min": 10000,
+    "system_status_interval": 120,
+    "system_voltage_interval": 30
+}
