@@ -18,6 +18,7 @@ import (
 func NewHandler(m *device.Manager) *Handler {
 	a := &Handler{
 		devManager: m,
+		lastAttrs:  make(map[string]string),
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -31,6 +32,7 @@ func NewHandler(m *device.Manager) *Handler {
 type Handler struct {
 	httpClient *http.Client
 	devManager *device.Manager
+	lastAttrs  map[string]string
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -94,10 +96,18 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q.Add("snr", fmt.Sprintf("%g", data.Snr))
 	q.Add("rssi", strconv.Itoa(data.Rssi))
 	q.Add("speed", fmt.Sprintf("%f", data.Speed))
-	for n, v := range data.Attr {
-		q.Add(n, fmt.Sprintf("%v", v))
 
+	// Add last reocorded attributes in case they are missing in the new request
+	// and they will be overrided by the new value if the attr exists.
+	for n, v := range s.lastAttrs {
+		q.Set(n, fmt.Sprintf("%v", v))
 	}
+	// Override the attr with the new values.
+	for n, v := range data.Attr {
+		s.lastAttrs[n] = v
+		q.Set(n, fmt.Sprintf("%v", v))
+	}
+
 	req.URL.RawQuery = q.Encode()
 
 	res, err := s.httpClient.Do(req)
