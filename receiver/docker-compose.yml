@@ -366,7 +366,28 @@ services:
     image: arribada/lora-gps-server:master
     ports:
     - "8070:8070"
-
+  piwatcher:
+    image: arribada/piwatcher:master
+    privileged: true
+    command:
+        - "/bin/sh"
+        - "-c"
+        # `piwatcher status` keeps the heartbeet,
+        # if no heartbeat in `piwatcher watch ...` period it will shutdown
+        # and will start after `piwatcher wake ...` period.
+        - "./piwatcher wake 5 && ./piwatcher watch 255 && while true; do ./piwatcher status; sleep 60; done"
+  reboot-schedule:
+    image: "curlimages/curl:7.79.1"
+    labels:
+        io.balena.features.supervisor-api: '1'
+    environment:
+        - 'DBUS_SYSTEM_BUS_ADDRESS=unix:path=/host/run/dbus/system_bus_socket'
+    entrypoint:
+        - "/bin/sh"
+    command:
+        - "-c"
+        # reboot every day
+        - 'sleep 86400 && curl -X POST --header "Content-Type:application/json" "$BALENA_SUPERVISOR_ADDRESS/v1/reboot?apikey=$BALENA_SUPERVISOR_API_KEY"'
 
 volumes:
   # smart-postgres:
