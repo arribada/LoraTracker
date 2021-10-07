@@ -375,7 +375,7 @@ services:
         # `piwatcher status` keeps the heartbeet,
         # if no heartbeat in `piwatcher watch ...` period it will shutdown
         # and will start after `piwatcher wake ...` period.
-        - "./piwatcher wake 5 && ./piwatcher watch 255 && while true; do ./piwatcher status; sleep 60; done"
+        - "./piwatcher wake 5 && ./piwatcher watch 255 && while true; do ./piwatcher status; sleep 120; done"
   reboot-schedule:
     image: "curlimages/curl:7.79.1"
     labels:
@@ -386,7 +386,7 @@ services:
         - "/bin/sh"
     command:
         - "-c"
-        # reboot every day
+        # reboot 24h after bootup
         - 'sleep 86400 && curl -X POST --header "Content-Type:application/json" "$BALENA_SUPERVISOR_ADDRESS/v1/reboot?apikey=$BALENA_SUPERVISOR_API_KEY"'
 
 volumes:
