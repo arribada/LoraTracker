@@ -12,13 +12,14 @@ import (
 	"strconv"
 
 	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device"
+	"github.com/brocaar/lorawan"
 )
 
 // NewHandler creates a new alert type handler.
 func NewHandler(m *device.Manager) *Handler {
 	a := &Handler{
 		devManager: m,
-		lastAttrs:  make(map[string]string),
+		lastAttrs:  make(map[lorawan.EUI64]map[string]string),
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -32,7 +33,7 @@ func NewHandler(m *device.Manager) *Handler {
 type Handler struct {
 	httpClient *http.Client
 	devManager *device.Manager
-	lastAttrs  map[string]string
+	lastAttrs  map[lorawan.EUI64]map[string]string
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -99,12 +100,12 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Add last reocorded attributes in case they are missing in the new request
 	// and they will be overrided by the new value if the attr exists.
-	for n, v := range s.lastAttrs {
+	for n, v := range s.lastAttrs[data.Payload.DevEUI] {
 		q.Set(n, fmt.Sprintf("%v", v))
 	}
 	// Override the attr with the new values.
 	for n, v := range data.Attr {
-		s.lastAttrs[n] = v
+		s.lastAttrs[data.Payload.DevEUI][n] = v
 		q.Set(n, fmt.Sprintf("%v", v))
 	}
 
