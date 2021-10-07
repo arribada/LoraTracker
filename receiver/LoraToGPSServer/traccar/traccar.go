@@ -46,6 +46,10 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.SetPrefix("devName:" + data.Payload.DeviceName + ", msg:")
 	defer log.SetPrefix("")
 
+	for n, v := range data.Attr {
+		s.lastAttrs[data.Payload.DevEUI][n] = v
+	}
+
 	if !data.Valid {
 		if os.Getenv("DEBUG") == "1" {
 			log.Printf("skipping data with invalid or stale gps coords, body:%+v", data)
@@ -105,7 +109,6 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Override the attr with the new values.
 	for n, v := range data.Attr {
-		s.lastAttrs[data.Payload.DevEUI][n] = v
 		q.Set(n, fmt.Sprintf("%v", v))
 	}
 
