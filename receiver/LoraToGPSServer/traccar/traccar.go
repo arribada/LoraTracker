@@ -47,6 +47,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer log.SetPrefix("")
 
 	for n, v := range data.Attr {
+		s.lastAttrs[data.Payload.DevEUI] = make(map[string]string)
 		s.lastAttrs[data.Payload.DevEUI][n] = v
 	}
 
