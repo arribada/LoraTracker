@@ -229,7 +229,7 @@ If you want to upload data into SMART desktop it needs to be connected to SMART 
 
 If traccar fails to start with - `Waiting for changelog lock`
  - stop the container and run the following commands on the device.
- - `balena run -it -v 1853980_traccar-database:/opt/traccar/data --entrypoint=/bin/bash traccar/traccar:4.14-ubuntu`
+ - `balena run -it --rm -v 1853980_traccar-database:/opt/traccar/data --entrypoint=/bin/bash traccar/traccar:4.14-ubuntu`
  - `java -cp lib/h2*.jar org.h2.tools.Shell -url "jdbc:h2:/opt/traccar/data/database" -driver org.h2.Driver -user sa`
  - `SELECT * FROM PUBLIC.DATABASECHANGELOGLOCK;`
  - `update PUBLIC.DATABASECHANGELOGLOCK set locked=0 WHERE ID=1;`
