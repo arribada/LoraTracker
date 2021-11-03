@@ -185,8 +185,8 @@ Uplink data URL: http://lora-gps-server:8070/smartConnect
 Payload marshaler: JSON legacy
 headers:
     traccarServer: http://traccar:5055
-# Or the IP if not on the same machine as the packet forwarder.
-Endpoints: http://lora-gps-server:8070/traccar
+Endpoints: http://lora-gps-server:8070/traccar # Or the IP if not on the same machine as the packet forwarder.
+
 ```
 > multiple Endpoints are separated by coma:<br/>
 > http://lora-gps-server:8070/smartConnect, http://lora-gps-server:8070/traccar
