@@ -110,8 +110,9 @@ Add gateway meta-data: selected
         LoRaWAN MAC version: 1.0.3
         LoRaWAN Regional Parameters revision: A
         Codec: Custom JavaScript codec functions
-            For the decode field use the file decoder.js from the configs folder
-            For the encode field use the file encoder.js from the configs folder
+            For the decode/encode field -  ask Irnas which ones to use from https://toolset.smartparks.org/
+            Also ensure the decoder includes all fields expected by `lora-to-gps` server - hdop,lat,lon,gps_resend,gps_time,time,battery,motion
+
         ```
 - Gateways/Create
 ```
