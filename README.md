@@ -119,7 +119,7 @@ Add gateway meta-data: selected
 name: main
 description: anything
 # for Rpi sender - look for the gateway_ID in the sender's compose file or in the corresponding env variable  if overridden by one.
-# for Lorix one - http://lorixOneIP/lora/forwarder or in the config file:` /etc/lora-packet-forwarder/global_conf.json`
+# for Lorix one - it is the mac address or look at http://lorixOneIP/lora/forwarder or in the config file:` /etc/lora-packet-forwarder/global_conf.json`
 id:...
 server: main
 location: #drag the pin to the current gateway location. This determines when a gps tag is outside a parimeter and when to send Prometheus alerts.
