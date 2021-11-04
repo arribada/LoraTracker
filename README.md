@@ -86,6 +86,15 @@ server: gpsTracker
 Add gateway meta-data: selected
 ```
 - Device-profiles/Create
+
+    Join tab settings.
+    ```
+    RX1 delay - 1
+    RX2 data-rate - 3
+    RX2 channel frequency - 869525000
+    Factory-preset frequencies - 868100000, 868300000, 868500000, 867100000, 867300000, 867500000, 867900000
+    ```
+
     - For Rpi sender (skip when not using the Rpi sender)
         ```
         name: rpi
