@@ -276,14 +276,13 @@ services:
 
 ### Chirpstack containers.
   # chirpstack-gatewaybridge: # When using lorix it runs directly on the Lorix OS so not needed.
-  #   image: chirpstack/chirpstack-gateway-bridge:3.13.0-test.2
+  #   image: chirpstack/chirpstack-gateway-bridge:3.13.3
   #   ports:
   #     - 1700:1700/udp
   #   environment:
   #     - INTEGRATION__MQTT__AUTH__GENERIC__SERVERS=tcp://chirpstack-mosquitto:1883
 
   chirpstack-networkserver:
-  # image: chirpstack/chirpstack-network-server:3.15.0-test.2
     image: chirpstack/chirpstack-network-server:3.15.3
     environment:
       - REDIS__URL=redis://chirpstack-redis:6379
@@ -292,7 +291,6 @@ services:
       - JOIN_SERVER__DEFAULT__SERVER=http://chirpstack-appserver:8003
       - GEOLOCATION_SERVER__SERVER=chirpstack-geoserver:8005
   chirpstack-appserver:
-  # image: chirpstack/chirpstack-application-server:3.17.0-test.2
     image: chirpstack/chirpstack-application-server:3.17.3
     ports:
       - "8080:8080"
