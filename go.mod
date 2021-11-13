@@ -1,3 +1,3 @@
 module github.com/arribada/LoraTracker
 
-go 1.14
+go 1.17.2

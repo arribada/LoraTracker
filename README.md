@@ -13,13 +13,6 @@ If you use standalone GPS tags for sending don't need to create an app for the s
 
 ### At fleet level add env vars
 
- - For the Rpi Lora hat (Skip when using Lorix one for receiving)
-
-```
- # The semtech gateway setting. See https://github.com/arribada/packet-forwarder
-CONCENTRATOR_CONFIG=
-```
-
  - For the Chirpstack server.
 ```
 APPLICATION_SERVER__EXTERNAL_API__JWT_SECRET=.... # Choose one
@@ -99,7 +92,7 @@ Add gateway meta-data: selected
         ```
         name: rpi
         server: local
-        LoRaWAN MAC version: 1.0.3
+        LoRaWAN MAC version: 1.0.2
         LoRaWAN Regional Parameters revision: A
         Join (OTAA / ABP): Device supports OTAA
         ```

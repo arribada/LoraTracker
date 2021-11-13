@@ -347,12 +347,27 @@ func newLoraConnection() (*rak811.Lora, error) {
 	if len(appKey) != 32 {
 		log.Fatalf("APP_KEY should be 32 char long, current length:%v", len(appKey))
 	}
+	netKey := os.Getenv("NET_KEY")
+	if netKey == "" {
+		log.Fatal("missing NET_KEY env variable")
+	}
+	if len(netKey) != 32 {
+		log.Fatalf("NET_KEY should be 32 char long, current length:%v", len(appKey))
+	}
 	devEUI := os.Getenv("DEV_EUI")
 	if appKey == "" {
 		log.Fatal("missing DEV_EUI env variable")
 	}
 	if len(devEUI) != 16 {
 		log.Fatalf("DEV_EUI should be 16 char long, current length:%v", len(devEUI))
+	}
+
+	devAddr := os.Getenv("DEV_ADDR")
+	if appKey == "" {
+		log.Fatal("missing DEV_EUI env variable")
+	}
+	if len(devAddr) != 8 {
+		log.Fatalf("devAddr should be 8 char long, current length:%v", len(devAddr))
 	}
 
 	dataRate := os.Getenv("DATA_RATE")
@@ -401,7 +416,11 @@ func newLoraConnection() (*rak811.Lora, error) {
 	// If the received data is empty should increase the dr settings.
 	// https://docs.exploratory.engineering/lora/dr_sf/
 	// https://www.compel.ru/item-pdf/7008b5e14cfb8d82cebabdb784d57018/pn/rak~rak811.pdf
-	config := "adr:off" + "&dr:" + dataRate + "&pwr_level:0" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:00000000000000000000000000000000"
+	// For OTAA
+	// config := "adr:off" + "&dr:" + dataRate + "&pwr_level:0" + "&dev_eui:" + devEUI + "&app_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:" + netKey
+	// For ABP
+	config := "adr:off" + "&dr:" + dataRate + "&pwr_level:0" + "&dev_addr:" + devAddr + "&dev_eui:" + devEUI + "&apps_key:" + appKey + "&app_eui:0000010000000000" + "&nwks_key:" + netKey
+
 	resp, err = lora.SetConfig(config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "set lora config with:%v", config)
@@ -418,7 +437,8 @@ func newLoraConnection() (*rak811.Lora, error) {
 		if os.Getenv("DEBUG") == "1" {
 			log.Print("sending join request attempt:", attempt)
 		}
-		resp, err = lora.JoinOTAA()
+		// resp, err = lora.JoinOTAA()
+		resp, err = lora.JoinABP()
 		if err != nil || attempt > 25 {
 			log.Println("Reseting the module due to a join request err:", err, "or too many attempts:", attempt)
 			lora.Close()

@@ -1,4 +1,4 @@
-FROM balenalib/raspberry-pi-alpine-golang:1.12 AS build
+FROM balenalib/raspberry-pi-alpine-golang:1.17.1-3.12 AS build
 RUN apk add --no-cache git ca-certificates
 COPY ./ /tmp/builder/
 WORKDIR /tmp/builder/

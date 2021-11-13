@@ -257,7 +257,16 @@ func (l *Lora) JoinOTAA() (string, error) {
 
 // JoinABP join the configured network in ABP mode.
 func (l *Lora) JoinABP() (string, error) {
-	return l.txr("join=abp", 1)
+	resp, err := l.txr("join=abp", 1)
+	if err != nil {
+		return "", err
+	}
+	if resp != OK {
+		return "", errors.New(resp) // Convert the resp to an error so that the caller handle it properly.
+	}
+
+	// Doesn't need to wait for join reply so just return success.
+	return STATUS_JOINED_SUCCESS, nil
 }
 
 // Signal check the radio rssi, snr, update by latest received radio packet.

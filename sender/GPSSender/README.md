@@ -9,6 +9,7 @@ DEBUG=1 - enable debug logging.
 HDOP - set a minimum HDOP accuracy level. Usually anything below 1.50 is good
 APP_KEY - required lora server app key
 DEV_EUI - required lora server dev key
+DEV_ADDR  - required when using ABP
 BAND - set the frequency band. One of:"EU868", "US915", "AU915", "KR920", "AS923"
 DATA_RATE - set the lora data rate - https://docs.exploratory.engineering/lora/dr_sf
 SINGLE_POINTS=1 - send updates as single points or continious line.
