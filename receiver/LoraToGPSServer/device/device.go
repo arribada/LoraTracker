@@ -241,11 +241,17 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 
 	lat, ok := data.Object["lat"]
 	if !ok {
-		return nil, errors.New("data object doesn't contain lat")
+		lat, ok = data.Object["latitude"]
+		if !ok {
+			return nil, errors.New("data object doesn't contain lat")
+		}
 	}
 	lon, ok := data.Object["lon"]
 	if !ok {
-		return nil, errors.New("data object doesn't contain lon")
+		lon, ok = data.Object["longitude"]
+		if !ok {
+			return nil, errors.New("data object doesn't contain lon")
+		}
 	}
 
 	// Port 12 status messages contain only lat/lon.

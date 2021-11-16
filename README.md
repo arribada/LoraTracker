@@ -92,7 +92,7 @@ Add gateway meta-data: selected
         ```
         name: rpi
         server: local
-        LoRaWAN MAC version: 1.0.2
+        LoRaWAN MAC version: 1.0.3
         LoRaWAN Regional Parameters revision: A
         Join (OTAA / ABP): Device supports OTAA
         ```
@@ -109,7 +109,7 @@ Add gateway meta-data: selected
         ```
 - Gateways/Create
 ```
-name: main
+name: lorix
 description: anything
 # for Rpi sender - look for the gateway_ID in the sender's compose file or in the corresponding env variable  if overridden by one.
 # for Lorix one - it is the mac address or look at http://lorixOneIP/lora/forwarder or in the config file:` /etc/lora-packet-forwarder/global_conf.json`
