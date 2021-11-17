@@ -300,12 +300,6 @@ func irnasParseSingle(data dataInterface) (*Data, error) {
 	}
 	dataParsed.Hdop = hdop.(float64)
 
-	// When resent is more than 1 it means NO new gps coordinates are available and
-	// the latest ones were resent so can be ignored.
-	if val, ok := data["gps_resend"]; ok && val.(float64) != 1.0 {
-		dataParsed.Valid = false
-	}
-
 	dataParsed.Lat = lat.(float64)
 	dataParsed.Lon = lon.(float64)
 	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
