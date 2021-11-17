@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/device"
-	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/smartConnect"
 	"github.com/arribada/LoraTracker/receiver/LoraToGPSServer/traccar"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -34,7 +33,7 @@ func main() {
 	}
 
 	manager := device.NewManager()
-	smartConnectHandler := smartConnect.NewHandler(manager)
+	// smartConnectHandler := smartConnect.NewHandler(manager)
 	traccarHandler := traccar.NewHandler(manager)
 
 	log.Println("starting server at port:", *receivePort)
@@ -44,7 +43,7 @@ func main() {
 
 	// Keep handlers separate so that if one server returns an error
 	// it doesn't affect updates to the others.
-	http.Handle("/smartConnect", smartConnectHandler)
+	// http.Handle("/smartConnect", smartConnectHandler)
 	http.Handle("/traccar", traccarHandler)
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":"+*receivePort, nil))

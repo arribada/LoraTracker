@@ -54,7 +54,7 @@ type Manager struct {
 	allDevIDs map[string]*Data
 }
 
-func (self *Manager) Parse(r *http.Request) (*Data, error) {
+func (self *Manager) Parse(r *http.Request) ([]*Data, error) {
 	c, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "reading request body")
@@ -75,13 +75,13 @@ func (self *Manager) Parse(r *http.Request) (*Data, error) {
 		return nil, fmt.Errorf("request payload doesn't include device type tags:%+v", data.Tags)
 	}
 
-	var dataParsed *Data
+	var points []*Data
 
 	switch devType {
 	case "rpi":
-		dataParsed, err = Rpi(string(data.Data))
+		points, err = Rpi(string(data.Data))
 	case "irnas":
-		dataParsed, err = Irnas(data)
+		points, err = Irnas(data)
 	default:
 		return nil, fmt.Errorf("unsuported device type:%v", devType)
 	}
@@ -89,42 +89,46 @@ func (self *Manager) Parse(r *http.Request) (*Data, error) {
 		return nil, errors.Wrapf(err, "parsing device data type:%v", devType)
 	}
 
-	dataParsed.Payload = data
-	dataParsed.Type = devType
-	dataParsed.ID = GenID(data)
+	for i, point := range points {
+		point.Payload = data
+		point.Type = devType
+		point.ID = GenID(data)
 
-	// Update the metrics only for non duplicate requests.
-	// A duplicate request happens because the lora server is set to send
-	// the same request for each backend server - traccar, smart connect etc.
-	if self.lastFCnt != data.FCnt {
-		if err := self.update(dataParsed); err != nil {
-			return nil, err
-		}
-	}
-	self.lastFCnt = data.FCnt
-
-	if dataParsed.Motion {
-		dataParsed.Speed = self.Speed(dataParsed.ID)
-	}
-
-	if len(data.RXInfo) == 0 {
-		if os.Getenv("DEBUG") == "1" {
-			log.Println("received lora data doesn't include gateway meta data")
-		}
-	} else {
-		for i, g := range data.RXInfo {
-			// Record only the signal from the nearest gateway.
-			// Only the strongest signal.
-			if i == 0 || g.LoRaSNR > dataParsed.Snr {
-				dataParsed.Snr = g.LoRaSNR
-			}
-			if i == 0 || g.RSSI > dataParsed.Rssi {
-				dataParsed.Rssi = g.RSSI
+		// Update the metrics only for non duplicate requests.
+		// A duplicate request happens because the lora server is set to send
+		// the same request for each backend server - traccar, smart connect etc.
+		if self.lastFCnt != data.FCnt {
+			if err := self.update(point); err != nil {
+				return nil, err
 			}
 		}
+		self.lastFCnt = data.FCnt
+
+		if point.Motion {
+			point.Speed = self.Speed(point.ID)
+		}
+
+		if len(data.RXInfo) == 0 {
+			if os.Getenv("DEBUG") == "1" {
+				log.Println("received lora data doesn't include gateway meta data")
+			}
+		} else {
+			for i, g := range data.RXInfo {
+				// Record only the signal from the nearest gateway.
+				// Only the strongest signal.
+				if i == 0 || g.LoRaSNR > point.Snr {
+					point.Snr = g.LoRaSNR
+				}
+				if i == 0 || g.RSSI > point.Rssi {
+					point.Rssi = g.RSSI
+				}
+			}
+		}
+
+		points[i] = point
 	}
 
-	return dataParsed, err
+	return points, err
 
 }
 
@@ -184,7 +188,7 @@ func (s *Manager) incLastUpdateTime() {
 	}()
 }
 
-func Rpi(data string) (*Data, error) {
+func Rpi(data string) ([]*Data, error) {
 	coordinates := strings.Split(string(data), ",")
 	if len(coordinates) < 2 {
 		return nil, fmt.Errorf("parsing the cordinates string:%v", data)
@@ -221,50 +225,84 @@ func Rpi(data string) (*Data, error) {
 		d.Attr["s"] = "true"
 	}
 
-	return d, nil
+	return []*Data{d}, nil
 }
 
-func Irnas(data *DataUpPayload) (*Data, error) {
+type dataInterface map[string]interface{}
+
+func Irnas(data *DataUpPayload) ([]*Data, error) {
 	dataParsed := &Data{
 		Valid: true,
 		Attr:  map[string]string{},
 	}
 
 	// Non GPS data.
-	if data.FPort != 1 && data.FPort != 12 {
+	if data.FPort != 1 && data.FPort != 12 && data.FPort != 11 {
 		dataParsed.Valid = false
 		if os.Getenv("DEBUG") == "1" {
 			log.Printf("skipping non gps data, fport:%+v", data.FPort)
 		}
-		return dataParsed, nil
+		return []*Data{dataParsed}, nil
 	}
 
-	lat, ok := data.Object["lat"]
+	logRaw, ok := data.Object["locations"]
 	if !ok {
-		lat, ok = data.Object["latitude"]
+		d, err := irnasParseSingle(data.Object)
+		return []*Data{d}, err
+	}
+
+	logs := make([]dataInterface, 5)
+
+	err := json.Unmarshal([]byte(logRaw.(string)), &logs)
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing locations json")
+	}
+
+	var logsParsed []*Data
+
+	for _, log := range logs {
+		data, err := irnasParseSingle(log)
+		if err != nil {
+			return nil, errors.Wrap(err, "parsing single location")
+		}
+		logsParsed = append(logsParsed, data)
+	}
+
+	return logsParsed, nil
+}
+
+func irnasParseSingle(data dataInterface) (*Data, error) {
+	dataParsed := &Data{
+		Valid: true,
+		Attr:  map[string]string{},
+	}
+
+	lat, ok := data["lat"]
+	if !ok {
+		lat, ok = data["latitude"]
 		if !ok {
-			return nil, errors.New("data object doesn't contain lat")
+			return nil, errors.New("data doesn't contain lat")
 		}
 	}
-	lon, ok := data.Object["lon"]
+	lon, ok := data["lon"]
 	if !ok {
-		lon, ok = data.Object["longitude"]
+		lon, ok = data["longitude"]
 		if !ok {
 			return nil, errors.New("data object doesn't contain lon")
 		}
 	}
 
 	// Port 12 status messages contain only lat/lon.
-	hdop, ok := data.Object["hdop"]
+	hdop, ok := data["hdop"]
 	if !ok {
-		log.Printf("data object doesn't contain hdop so setting to 0 fport:%+v", data.FPort)
+		log.Printf("data object doesn't contain hdop so setting to 0")
 		hdop = 0.0
 	}
 	dataParsed.Hdop = hdop.(float64)
 
 	// When resent is more than 1 it means NO new gps coordinates are available and
 	// the latest ones were resent so can be ignored.
-	if val, ok := data.Object["gps_resend"]; ok && val.(float64) != 1.0 {
+	if val, ok := data["gps_resend"]; ok && val.(float64) != 1.0 {
 		dataParsed.Valid = false
 	}
 
@@ -273,17 +311,17 @@ func Irnas(data *DataUpPayload) (*Data, error) {
 	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
 		dataParsed.Valid = false
 	}
-	if val, ok := data.Object["gps_time"]; ok { // From system updates.
+	if val, ok := data["gps_time"]; ok { // From system updates.
 		dataParsed.Time = int64(val.(float64))
 	}
-	if val, ok := data.Object["time"]; ok { // From periodic or motion triggered updates.
+	if val, ok := data["time"]; ok { // From periodic or motion triggered updates.
 		dataParsed.Time = int64(val.(float64))
 	}
 
-	if val, ok := data.Object["battery"]; ok {
+	if val, ok := data["battery"]; ok {
 		dataParsed.Attr["battery"] = fmt.Sprintf("%v", val.(float64))
 	}
-	if val, ok := data.Object["motion"]; ok && int64(val.(float64)) > 0 {
+	if val, ok := data["motion"]; ok && int64(val.(float64)) > 0 {
 		dataParsed.Motion = true
 	}
 
