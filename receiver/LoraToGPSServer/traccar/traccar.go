@@ -63,8 +63,8 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer log.SetPrefix("")
 
 		for n, v := range point.Attr {
-			s.lastAttrs[point.Payload.DevEUI] = make(map[string]string)
-			s.lastAttrs[point.Payload.DevEUI][n] = v
+			s.lastAttrs[point.Payload.DevEui] = make(map[string]string)
+			s.lastAttrs[point.Payload.DevEui][n] = v
 		}
 
 		if !point.Valid {
@@ -98,7 +98,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		q := req.URL.Query()
-		q.Add("id", point.Payload.DevEUI.String())
+		q.Add("id", point.Payload.DevEui.String())
 		q.Add("lat", fmt.Sprintf("%g", point.Lat))
 		q.Add("timestamp", strconv.Itoa(int(point.Time)))
 		q.Add("lon", fmt.Sprintf("%g", point.Lon))
@@ -108,7 +108,7 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// Add last reocorded attributes in case they are missing in the new request
 		// and they will be overrided by the new value if the attr exists.
-		for n, v := range s.lastAttrs[point.Payload.DevEUI] {
+		for n, v := range s.lastAttrs[point.Payload.DevEui] {
 			q.Set(n, fmt.Sprintf("%v", v))
 		}
 		// Override the attr with the new values.

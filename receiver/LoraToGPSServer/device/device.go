@@ -63,7 +63,7 @@ func (self *Manager) Parse(r *http.Request) ([]*Data, error) {
 	if os.Getenv("DEBUG") == "1" {
 		log.Printf("incoming request body:%v RemoteAddr:%v headers:%+v \n", string(c), r.RemoteAddr, r.Header)
 	}
-
+	fmt.Println(string(c))
 	data := &DataUpPayload{}
 	err = json.Unmarshal(c, data)
 	if err != nil {
@@ -74,14 +74,18 @@ func (self *Manager) Parse(r *http.Request) ([]*Data, error) {
 	if !ok {
 		return nil, fmt.Errorf("request payload doesn't include device type tags:%+v", data.Tags)
 	}
-
+	var _ *Data
 	var points []*Data
 
 	switch devType {
 	case "rpi":
 		points, err = Rpi(string(data.Data))
+	case "antratek":
+		points, err = antratekParse(data)
 	case "irnas":
 		points, err = Irnas(data)
+	case "Second":
+		points, err = G62Parse(data)
 	default:
 		return nil, fmt.Errorf("unsuported device type:%v", devType)
 	}
@@ -143,6 +147,12 @@ func (self *Manager) update(data *Data) error {
 	} else {
 		// Distance from each gateway that received this data.
 		for _, gwMeta := range data.Payload.RXInfo {
+			if gwMeta.Location == nil {
+				if os.Getenv("DEBUG") == "1" {
+					log.Println("recieved meta gateway without location")
+				}
+				continue
+			}
 			if data.Valid {
 				dist, err := Distance(data.Lat, data.Lon, gwMeta.Location.Latitude, gwMeta.Location.Longitude, "K")
 				if err != nil {
@@ -322,31 +332,174 @@ func irnasParseSingle(data dataInterface) (*Data, error) {
 	return dataParsed, nil
 }
 
+
+
+
+func G62Parse(data *DataUpPayload) ([]*Data, error) {
+
+	dataParsed := &Data{
+		Valid: true,
+		Attr:  map[string]string{},
+	}
+
+	// Non GPS data.
+	if data.FPort != 1 {
+		dataParsed.Valid = false
+		if os.Getenv("DEBUG") == "1" {
+			log.Printf("skipping non gps data, fport:%+v", data.FPort)
+		}
+		return []*Data{dataParsed}, nil
+	}
+
+	lat, ok := data.Object["latitudeDeg"]
+	if !ok {
+		return nil, errors.New("data doesn't contain lat")
+	}
+	lon, ok := data.Object["longitudeDeg"]
+	
+	if !ok {
+		return nil, errors.New("data object doesn't contain lon")
+	}
+	//data.DevEUI=data.DeviceInfo.DevEui
+
+	dataParsed.Time = int64( data.Time.Unix())
+	
+
+	// Port 12 status messages contain only lat/lon.
+	hdop, ok := data.Object["hdop"]
+	if !ok {
+		log.Printf("data object doesn't contain hdop so setting to 0")
+		hdop = 0.0
+	}
+	dataParsed.Hdop = hdop.(float64)
+
+	dataParsed.Lat = lat.(float64)
+	dataParsed.Lon = lon.(float64)
+	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
+		dataParsed.Valid = false
+	}
+	/*if val, ok := data["gps_time"]; ok { // From system updates.
+		dataParsed.Time = int64(val.(float64))
+	}
+	if val, ok := data["time"]; ok { // From periodic or motion triggered updates.
+		dataParsed.Time = int64(val.(float64))
+	}*/
+
+	if val, ok := data.Object["speedKmph"]; ok {
+		dataParsed.Attr["speedKmph"] = fmt.Sprintf("%v", val.(float64))
+	}
+	if val, ok := data.Object["tempC"]; ok && int64(val.(float64)) > 0 {
+		dataParsed.Attr["temperature"] = fmt.Sprintf("%v", val.(float64))
+	}
+
+	return []*Data{dataParsed}, nil
+}
+
+func antratekParse(data *DataUpPayload) ([]*Data, error) {
+
+	dataParsed := &Data{
+		Valid: true,
+		Attr:  map[string]string{},
+	}
+
+	// Non GPS data.
+	if data.FPort != 136 {
+		dataParsed.Valid = false
+		if os.Getenv("DEBUG") == "1" {
+			log.Printf("skipping non gps data, fport:%+v", data.FPort)
+		}
+		return []*Data{dataParsed}, nil
+	}
+
+	lat, ok := data.Object["positionLatitude"]
+	if !ok {
+		return nil, errors.New("data doesn't contain lat")
+	}
+	lon, ok := data.Object["positionLongitude"]
+	
+	if !ok {
+		return nil, errors.New("data object doesn't contain lon")
+	}
+	//data.DevEUI=data.DeviceInfo.DevEui
+
+	dataParsed.Time = int64( data.Time.Unix())
+	
+
+	// Port 12 status messages contain only lat/lon.
+	hdop, ok := data.Object["hdop"]
+	if !ok {
+		log.Printf("data object doesn't contain hdop so setting to 0")
+		hdop = 0.0
+	}
+	dataParsed.Hdop = hdop.(float64)
+
+	dataParsed.Lat = lat.(float64)
+	dataParsed.Lon = lon.(float64)
+	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
+		dataParsed.Valid = false
+	}
+	/*if val, ok := data["gps_time"]; ok { // From system updates.
+		dataParsed.Time = int64(val.(float64))
+	}
+	if val, ok := data["time"]; ok { // From periodic or motion triggered updates.
+		dataParsed.Time = int64(val.(float64))
+	}*/
+
+	if val, ok := data.Object["battery"]; ok {
+		dataParsed.Attr["battery"] = fmt.Sprintf("%v", val.(float64))
+	}
+	if val, ok := data.Object["temperature"]; ok && int64(val.(float64)) > 0 {
+		dataParsed.Attr["temperature"] = fmt.Sprintf("%v", val.(float64))
+	}
+
+	return []*Data{dataParsed}, nil
+}
+
 // DataUpPayload represents a data-up payload.
 type DataUpPayload struct {
-	ApplicationID   int64                  `json:"applicationID,string"`
-	ApplicationName string                 `json:"applicationName"`
-	DeviceName      string                 `json:"deviceName"`
-	DevEUI          lorawan.EUI64          `json:"devEUI"`
-	RXInfo          []RXInfo               `json:"rxInfo,omitempty"`
-	TXInfo          TXInfo                 `json:"txInfo"`
-	ADR             bool                   `json:"adr"`
-	FCnt            uint32                 `json:"fCnt"`
-	FPort           uint8                  `json:"fPort"`
-	Data            []byte                 `json:"data"`
-	Object          map[string]interface{} `json:"object,omitempty"`
-	Tags            map[string]string      `json:"tags,omitempty"`
-	Variables       map[string]string      `json:"-"`
+	Time       *time.Time             `json:"time"`
+	TXInfo     TXInfo                 `json:"txInfo"`
+	ADR        bool                   `json:"adr"`
+	FCnt       uint32                 `json:"fCnt"`
+	FPort      uint8                  `json:"fPort"`
+	Data       []byte                 `json:"data"`
+	Object     map[string]interface{} `json:"object,omitempty"`
+	Variables  map[string]string      `json:"-"`
+	DeviceInfo `json:"deviceInfo"`
+}
+
+// DataUpPayload represents a data-up payload.
+type DataUpPayloadAntratek struct {
+	DeduplicationId string `json:"deduplicationId"`
+
+	DeviceInfo []DeviceInfo `json:"deviceInfo"`
+}
+
+type DeviceInfo struct {
+	TenantId          string            `json:"tenantId"`
+	TenantName        string            `json:"tenantName"`
+	ApplicationName   string            `json:"applicationName"`
+	ApplicationId     string            `json:"applicationId"`
+	DeviceProfileId   string            `json:"deviceProfileId"`
+	DeviceProfileName string            `json:"deviceProfileName"`
+	DeviceName        string            `json:"deviceName"`
+	DevEui            lorawan.EUI64     `json:"devEui"`
+	RXInfo            []RXInfo          `json:"rxInfo,omitempty"`
+	Tags              map[string]string `json:"tags"`
+}
+
+type Tags struct {
+	Type string `json:"type"`
 }
 
 // RXInfo contains the RX information.
 type RXInfo struct {
 	GatewayID lorawan.EUI64 `json:"gatewayID"`
 	Name      string        `json:"name"`
-	Time      *time.Time    `json:"time,omitempty"`
-	RSSI      int           `json:"rssi"`
-	LoRaSNR   float64       `json:"loRaSNR"`
-	Location  *Location     `json:"location"`
+
+	RSSI     int       `json:"rssi"`
+	LoRaSNR  float64   `json:"loRaSNR"`
+	Location *Location `json:"location"`
 }
 
 // TXInfo contains the TX information.
@@ -456,5 +609,5 @@ func Speed(point1 *Data, point2 *Data) (float64, error) {
 }
 
 func GenID(data *DataUpPayload) string {
-	return data.DeviceName + "-" + data.DevEUI.String()
+	return data.DeviceName + "-" + data.DeviceInfo.DevEui.String()
 }
