@@ -429,12 +429,6 @@ func antratekParse(data *DataUpPayload) ([]*Data, error) {
 	if dataParsed.Lat == 0.0 || dataParsed.Lon == 0.0 {
 		dataParsed.Valid = false
 	}
-	/*if val, ok := data["gps_time"]; ok { // From system updates.
-		dataParsed.Time = int64(val.(float64))
-	}
-	if val, ok := data["time"]; ok { // From periodic or motion triggered updates.
-		dataParsed.Time = int64(val.(float64))
-	}*/
 
 	if val, ok := data.Object["battery"]; ok {
 		dataParsed.Attr["battery"] = fmt.Sprintf("%v", val.(float64))
