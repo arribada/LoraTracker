@@ -377,7 +377,8 @@ func G62Parse(data *DataUpPayload) ([]*Data, error) {
 	}
 
 	if val, ok := data.Object["speedKmph"]; ok {
-		dataParsed.Attr["speedKmph"] = fmt.Sprintf("%v", val.(float64))
+		dataParsed.Speed = fmt.Sprintf("%v", val.(float64))
+		dataParsed.Motion = true
 	}
 	if val, ok := data.Object["tempC"]; ok && int64(val.(float64)) > 0 {
 		dataParsed.Attr["temperature"] = fmt.Sprintf("%v", val.(float64))
