@@ -362,13 +362,7 @@ func G62Parse(data *DataUpPayload) ([]*Data, error) {
 	dataParsed.Time = int64( data.Time.Unix())
 	
 
-	// Port 12 status messages contain only lat/lon.
-	hdop, ok := data.Object["hdop"]
-	if !ok {
-		log.Printf("data object doesn't contain hdop so setting to 0")
-		hdop = 0.0
-	}
-	dataParsed.Hdop = hdop.(float64)
+
 
 	dataParsed.Lat = lat.(float64)
 	dataParsed.Lon = lon.(float64)
