@@ -81,7 +81,7 @@ func (self *Manager) Parse(r *http.Request) ([]*Data, error) {
 	case "rpi":
 		points, err = Rpi(string(data.Data))
 	case "antratek":
-		points, err = antratekParse(data)
+		points, err = Antratek(data)
 	case "irnas":
 		points, err = Irnas(data)
 	case "Second":
