@@ -468,12 +468,6 @@ type DataUpPayload struct {
 	DeviceInfo `json:"deviceInfo"`
 }
 
-// DataUpPayload represents a data-up payload.
-type DataUpPayloadAntratek struct {
-	DeduplicationId string `json:"deduplicationId"`
-
-	DeviceInfo []DeviceInfo `json:"deviceInfo"`
-}
 
 type DeviceInfo struct {
 	TenantId          string            `json:"tenantId"`
