@@ -63,7 +63,6 @@ func (self *Manager) Parse(r *http.Request) ([]*Data, error) {
 	if os.Getenv("DEBUG") == "1" {
 		log.Printf("incoming request body:%v RemoteAddr:%v headers:%+v \n", string(c), r.RemoteAddr, r.Header)
 	}
-	fmt.Println(string(c))
 	data := &DataUpPayload{}
 	err = json.Unmarshal(c, data)
 	if err != nil {
