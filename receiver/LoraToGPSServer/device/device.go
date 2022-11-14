@@ -412,7 +412,6 @@ func antratekParse(data *DataUpPayload) ([]*Data, error) {
 	if !ok {
 		return nil, errors.New("data object doesn't contain lon")
 	}
-	//data.DevEUI=data.DeviceInfo.DevEui
 
 	dataParsed.Time = int64( data.Time.Unix())
 	
