@@ -73,7 +73,6 @@ func (self *Manager) Parse(r *http.Request) ([]*Data, error) {
 	if !ok {
 		return nil, fmt.Errorf("request payload doesn't include device type tags:%+v", data.Tags)
 	}
-	var _ *Data
 	var points []*Data
 
 	switch devType {
